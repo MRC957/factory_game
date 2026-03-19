@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Factory Game</title>
+<style>
+  /* ── Reset & variables ─────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:     #1a1a2e;
+    --panel:  #16213e;
+    --accent: #0f3460;
+    --card:   #1e2d50;
+    --text:   #e0e0e0;
+    --muted:  #8899bb;
+    --green:  #4ecca3;
+    --red:    #e94560;
+    --gold:   #f5a623;
+    --border: #2a3a5e;
+    --radius: 8px;
+  }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Status bar ────────────────────────────────────────────────────── */
+  #status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--accent);
+    padding: 10px 16px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  .stat-block { display: flex; align-items: center; gap: 6px; }
+  .stat-label { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-value { font-weight: 700; font-size: 1rem; }
+  .sep { color: var(--border); font-size: 1.2rem; margin: 0 4px; }
+  #title { font-weight: 900; font-size: 1.1rem; color: var(--gold); letter-spacing: 0.05em; margin-right: 12px; }
+  .val-cash { color: var(--green); }
+  .val-day  { color: var(--gold); }
+  .val-warn { color: var(--red); }
+
+  /* ── Tabs ──────────────────────────────────────────────────────────── */
+  #tab-bar {
+    display: flex;
+    background: var(--panel);
+    border-bottom: 2px solid var(--accent);
+    flex-shrink: 0;
+  }
+  .tab-btn {
+    padding: 10px 22px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--muted);
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
+
+  /* ── Main area ─────────────────────────────────────────────────────── */
+  #main { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+  .tab-panel { display: none; flex: 1; overflow-y: auto; padding: 16px; }
+  .tab-panel.active { display: flex; flex-direction: column; gap: 16px; }
+
+  /* ── Cards ─────────────────────────────────────────────────────────── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .card-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--gold);
+    margin-bottom: 12px;
+  }
+
+  /* ── Two-column layouts ────────────────────────────────────────────── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .three-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 720px) {
+    .two-col { grid-template-columns: 1fr; }
+    .three-col { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────── */
+  table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+  th { text-align: left; padding: 6px 10px; color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.03); }
+
+  /* ── Forms ─────────────────────────────────────────────────────────── */
+  label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  input[type=number], select {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text);
+    padding: 7px 10px;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input[type=number]:focus, select:focus { border-color: var(--gold); }
+  .field { margin-bottom: 10px; }
+
+  /* ── Buttons ───────────────────────────────────────────────────────── */
+  button {
+    cursor: pointer;
+    border: none;
+    border-radius: 5px;
+    padding: 8px 18px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    transition: opacity 0.15s, filter 0.15s;
+  }
+  button:hover:not(:disabled) { filter: brightness(1.15); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary  { background: var(--accent); color: var(--text); }
+  .btn-buy      { background: var(--green); color: #0a1a14; }
+  .btn-sell     { background: var(--red);   color: #fff; }
+  .btn-craft    { background: #5555cc;      color: #fff; }
+  .btn-hire     { background: #aa6600;      color: #fff; }
+  .btn-nextday  { background: var(--gold);  color: #1a1200; font-size: 1rem; padding: 10px 28px; }
+  .btn-owned    { background: var(--border); color: var(--muted); }
+  .btn-row      { display: flex; gap: 8px; margin-top: 4px; }
+
+  /* ── Price change indicators ───────────────────────────────────────── */
+  .up   { color: var(--green); }
+  .down { color: var(--red); }
+  .flat { color: var(--muted); }
+  .profit { color: var(--green); font-weight: 700; }
+  .loss   { color: var(--red);   font-weight: 700; }
+  .risky  { color: var(--gold);  font-weight: 700; }
+  .owned-badge {
+    display: inline-block;
+    background: var(--green);
+    color: #0a1a14;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-left: 8px;
+  }
+
+  /* ── Inventory grid ────────────────────────────────────────────────── */
+  .inv-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+  .inv-item {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 6px 14px;
+    text-align: center;
+    min-width: 90px;
+  }
+  .inv-item .inv-name { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; }
+  .inv-item .inv-qty  { font-size: 1.3rem; font-weight: 700; }
+
+  /* ── Blueprint cards ───────────────────────────────────────────────── */
+  .bp-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .bp-card.owned { border-color: var(--green); }
+  .bp-name { font-weight: 700; font-size: 1rem; }
+  .bp-desc { color: var(--muted); font-size: 0.88rem; }
+  .bp-cost { color: var(--gold); font-weight: 700; }
+
+  /* ── Worker assignment row ─────────────────────────────────────────── */
+  .assign-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .assign-row:last-child { border-bottom: none; }
+  .assign-recipe { min-width: 90px; font-weight: 600; text-transform: capitalize; }
+  .assign-row input[type=number] { width: 70px; }
+  .assign-workers { color: var(--muted); font-size: 0.85rem; min-width: 90px; }
+
+  /* ── Cost preview ──────────────────────────────────────────────────── */
+  .cost-preview { font-size: 0.88rem; color: var(--muted); margin: 6px 0; }
+  .cost-preview span { color: var(--gold); font-weight: 700; }
+
+  /* ── Recipe info ───────────────────────────────────────────────────── */
+  .recipe-info { font-size: 0.85rem; color: var(--muted); padding: 8px; background: var(--panel); border-radius: 5px; margin-bottom: 8px; }
+
+  /* ── Bottom bar ────────────────────────────────────────────────────── */
+  #bottom-bar {
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+    background: var(--panel);
+    border-top: 2px solid var(--accent);
+    padding: 10px 16px;
+    flex-shrink: 0;
+  }
+  #log-box {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.82rem;
+    overflow-y: auto;
+    max-height: 110px;
+    min-height: 60px;
+    color: var(--text);
+  }
+  .log-entry { margin-bottom: 2px; line-height: 1.4; }
+  .log-day { color: var(--gold); font-weight: 700; }
+  .log-ok  { color: var(--green); }
+  .log-err { color: var(--red); }
+  #next-day-wrap { display: flex; align-items: center; flex-direction: column; gap: 6px; }
+  #days-input { width: 80px; text-align: center; }
+  .days-label { font-size: 0.72rem; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+
+<!-- ── Status bar ──────────────────────────────────────────────────────── -->
+<div id="status-bar">
+  <span id="title">⚙ FACTORY GAME</span>
+
+  <div class="stat-block">
+    <span class="stat-label">Day</span>
+    <span class="stat-value val-day" id="stat-day">1</span>
+  </div>
+  <span class="sep">|</span>
+  <div class="stat-block">
+    <span class="stat-label">Cash</span>
+    <span class="stat-value val-cash" id="stat-cash">$500.00</span>
+  </div>
+  <span class="sep">|</span>
+  <div class="stat-block">
+    <span class="stat-label">Workers</span>
+    <span class="stat-value" id="stat-workers">0</span>
+    <span class="stat-label" id="stat-workers-detail">(0 free)</span>
+  </div>
+  <span class="sep">|</span>
+  <div class="stat-block">
+    <span class="stat-label">Daily salary</span>
+    <span class="stat-value" id="stat-salary">$0.00</span>
+  </div>
+</div>
+
+<!-- ── Tab bar ─────────────────────────────────────────────────────────── -->
+<div id="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('market')">Market</button>
+  <button class="tab-btn" onclick="switchTab('factory')">Factory</button>
+  <button class="tab-btn" onclick="switchTab('blueprints')">Blueprints</button>
+  <button class="tab-btn" onclick="switchTab('margins')">Margins</button>
+</div>
+
+<!-- ── Main content ────────────────────────────────────────────────────── -->
+<div id="main">
+
+  <!-- MARKET TAB -->
+  <div class="tab-panel active" id="tab-market">
+    <div class="two-col">
+
+      <!-- Prices table -->
+      <div class="card">
+        <div class="card-title">Market Prices</div>
+        <table id="market-table">
+          <thead>
+            <tr><th>Item</th><th>Price</th><th>Change</th></tr>
+          </thead>
+          <tbody id="market-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- Buy / Sell form -->
+      <div class="card">
+        <div class="card-title">Buy / Sell</div>
+        <div class="field">
+          <label for="market-item">Item</label>
+          <select id="market-item" onchange="updateCostPreview()">
+            <option value="ore">ore</option>
+            <option value="wood">wood</option>
+            <option value="ingot">ingot</option>
+            <option value="gear">gear</option>
+            <option value="widget">widget</option>
+            <option value="scrap">scrap</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="market-qty">Quantity</label>
+          <input type="number" id="market-qty" value="1" min="1" max="9999" oninput="updateCostPreview()">
+        </div>
+        <div class="cost-preview">Total: <span id="cost-preview">$0.00</span></div>
+        <div class="btn-row">
+          <button class="btn-buy"  onclick="doBuy()">Buy</button>
+          <button class="btn-sell" onclick="doSell()">Sell</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Inventory -->
+    <div class="card">
+      <div class="card-title">Inventory</div>
+      <div class="inv-grid" id="inventory-grid"></div>
+    </div>
+  </div>
+
+  <!-- FACTORY TAB -->
+  <div class="tab-panel" id="tab-factory">
+    <div class="two-col">
+
+      <!-- Manual crafting -->
+      <div class="card">
+        <div class="card-title">Manual Crafting</div>
+        <div class="field">
+          <label for="craft-recipe">Recipe</label>
+          <select id="craft-recipe" onchange="updateRecipeInfo()">
+            <option value="ingot">ingot</option>
+            <option value="gear">gear</option>
+            <option value="widget">widget</option>
+            <option value="scrap_mix">scrap_mix</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="craft-qty">Batches</label>
+          <input type="number" id="craft-qty" value="1" min="1" max="9999">
+        </div>
+        <div class="recipe-info" id="recipe-info">Select a recipe to see its inputs and outputs.</div>
+        <button class="btn-craft" onclick="doCraft()">Craft</button>
+      </div>
+
+      <!-- Workers -->
+      <div class="card">
+        <div class="card-title">Workers</div>
+        <div class="field">
+          <label for="hire-qty">Hire quantity ($150 each)</label>
+          <input type="number" id="hire-qty" value="1" min="1" max="100">
+        </div>
+        <div style="margin-bottom:14px;">
+          <button class="btn-hire" onclick="doHire()">Hire Workers</button>
+        </div>
+
+        <div class="card-title" style="margin-top:12px;">Automation Assignment</div>
+        <div id="assign-list"></div>
+        <div style="margin-top:10px; font-size:0.82rem; color:var(--muted);">
+          Workers produce 1 batch per assigned worker per day automatically.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- BLUEPRINTS TAB -->
+  <div class="tab-panel" id="tab-blueprints">
+    <div class="three-col" id="blueprints-grid"></div>
+  </div>
+
+  <!-- MARGINS TAB -->
+  <div class="tab-panel" id="tab-margins">
+    <div class="card">
+      <div class="card-title">Recipe Margin Analysis (current market prices)</div>
+      <table id="margins-table">
+        <thead>
+          <tr>
+            <th>Recipe</th>
+            <th>Inputs</th>
+            <th>Input Cost</th>
+            <th>Outputs</th>
+            <th>Output Value</th>
+            <th>Margin</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="margins-tbody"></tbody>
+      </table>
+    </div>
+    <div class="card" id="margin-notes">
+      <div class="card-title">Notes</div>
+      <p style="color:var(--muted); font-size:0.88rem; line-height:1.6;">
+        Margins use live market prices. Blueprint upgrades reduce input consumption or boost output,
+        improving margins after purchase. <em>scrap_mix</em> is intentionally unprofitable under
+        normal conditions — it is designed to be a money-loser.
+      </p>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Bottom bar ──────────────────────────────────────────────────────── -->
+<div id="bottom-bar">
+  <div id="log-box"><div class="log-entry log-ok">Factory Game started. Good luck!</div></div>
+  <div id="next-day-wrap">
+    <div class="days-label">Days to advance</div>
+    <input type="number" id="days-input" value="1" min="1" max="30">
+    <button class="btn-nextday" onclick="doNextDay()">⏭ Next Day</button>
+  </div>
+</div>
+
+<script>
+// ── State ───────────────────────────────────────────────────────────────
+// G holds the latest snapshot from /api/state (or embedded in action responses).
+// All render functions read from G, so they can be re-run cheaply after any action.
+let G = null;
+
+// These constants mirror the server-side model and define rendering order.
+const ALL_ITEMS   = ["ore", "wood", "ingot", "gear", "widget", "scrap"];
+const ALL_RECIPES = ["ingot", "gear", "widget", "scrap_mix"];
+
+// ── Utilities ───────────────────────────────────────────────────────────
+// fmt: formats a number as a dollar amount, e.g. 12.5 → "$12.50"
+function fmt(n)   { return "$" + n.toFixed(2); }
+// fmtS: signed dollar amount for margins/deltas, e.g. -5 → "-$5.00", 3 → "+$3.00"
+function fmtS(n)  { return (n >= 0 ? "+" : "") + "$" + n.toFixed(2); }
+
+// Append one or more lines to the activity log at the bottom of the screen.
+// msg may contain newlines (multi-day advance output); each line gets its own div.
+function log(msg, cls = "") {
+  const box = document.getElementById("log-box");
+  msg.split("\n").filter(Boolean).forEach(line => {
+    const div = document.createElement("div");
+    div.className = "log-entry " + cls;
+    div.textContent = line;
+    box.appendChild(div);
+  });
+  box.scrollTop = box.scrollHeight;
+}
+
+// Insert a day-separator heading before the automation output of a new day.
+function logDay(day) {
+  const div = document.createElement("div");
+  div.className = "log-entry log-day";
+  div.textContent = "── Day " + day + " ──────────────────";
+  document.getElementById("log-box").appendChild(div);
+  document.getElementById("log-box").scrollTop = document.getElementById("log-box").scrollHeight;
+}
+
+// Thin fetch wrapper: GET when body is null, POST+JSON otherwise.
+// All action endpoints return {message, state}; /api/state just returns the state dict.
+async function api(path, body = null) {
+  const opts = body
+    ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+    : { method: "GET" };
+  const res = await fetch(path, opts);
+  return res.json();
+}
+
+// ── Render ──────────────────────────────────────────────────────────────
+// Master render: update G then repaint every section of the UI.
+// Full re-renders are cheap here (small DOM, no virtual-DOM diffing needed).
+function render(state) {
+  G = state;
+  renderStatusBar(state);
+  renderMarket(state);
+  renderInventory(state);
+  renderFactory(state);   // rebuilds the assignment inputs with current worker counts
+  renderBlueprints(state);
+  renderMargins(state);
+  updateCostPreview();    // recalculate the buy/sell cost preview with new prices
+  updateRecipeInfo();     // refresh the crafting recipe breakdown
+}
+
+function renderStatusBar(s) {
+  document.getElementById("stat-day").textContent = s.day;
+  const cashEl = document.getElementById("stat-cash");
+  cashEl.textContent = fmt(s.cash);
+  cashEl.className = "stat-value " + (s.cash >= 0 ? "val-cash" : "val-warn");
+  document.getElementById("stat-workers").textContent = s.total_workers;
+  document.getElementById("stat-workers-detail").textContent =
+    `(${s.assigned_workers} assigned, ${s.free_workers} free)`;
+  document.getElementById("stat-salary").textContent = fmt(s.daily_salary);
+}
+
+function renderMarket(s) {
+  const tbody = document.getElementById("market-tbody");
+  tbody.innerHTML = "";
+  ALL_ITEMS.forEach(item => {
+    const price  = s.market_prices[item] ?? 0;
+    // price_change is already converted to % by the server (fraction × 100).
+    const change = s.price_change[item]  ?? 0;
+    const arrow  = change > 0 ? "↑" : change < 0 ? "↓" : "→";
+    const cls    = change > 0 ? "up" : change < 0 ? "down" : "flat";
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${item}</td><td>${fmt(price)}</td>
+      <td class="${cls}">${arrow} ${change > 0 ? "+" : ""}${change.toFixed(1)}%</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderInventory(s) {
+  const grid = document.getElementById("inventory-grid");
+  grid.innerHTML = "";
+  ALL_ITEMS.forEach(item => {
+    const qty = s.inventory[item] ?? 0;
+    const div = document.createElement("div");
+    div.className = "inv-item";
+    div.innerHTML = `<div class="inv-name">${item}</div>
+      <div class="inv-qty" style="color:${qty > 0 ? "var(--text)" : "var(--muted)"}">${qty}</div>`;
+    grid.appendChild(div);
+  });
+}
+
+function renderFactory(s) {
+  const list = document.getElementById("assign-list");
+  list.innerHTML = "";
+  ALL_RECIPES.forEach(recipe => {
+    const current = s.assignments[recipe] ?? 0;
+    const row = document.createElement("div");
+    row.className = "assign-row";
+    // max is set to total_workers so the browser's native number validation
+    // prevents obviously-invalid inputs before the request even leaves the client.
+    row.innerHTML = `
+      <span class="assign-recipe">${recipe}</span>
+      <input type="number" id="assign-${recipe}" value="${current}" min="0" max="${s.total_workers}" style="width:70px">
+      <button class="btn-primary" onclick="doAssign('${recipe}')" style="padding:6px 12px;">Set</button>
+      <span class="assign-workers">${current > 0 ? current + " active" : "idle"}</span>`;
+    list.appendChild(row);
+  });
+}
+
+function renderBlueprints(s) {
+  const grid = document.getElementById("blueprints-grid");
+  grid.innerHTML = "";
+  Object.entries(s.blueprints).forEach(([name, bp]) => {
+    const div = document.createElement("div");
+    div.className = "bp-card" + (bp.owned ? " owned" : "");
+    // Convert snake_case keys to Title Case for display (e.g. "smelter_optimization" → "Smelter Optimization").
+    const label = name.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+    div.innerHTML = `
+      <div class="bp-name">${label}${bp.owned ? '<span class="owned-badge">✓ Owned</span>' : ""}</div>
+      <div class="bp-cost">${fmt(bp.cost)}</div>
+      <div class="bp-desc">${bp.description}</div>
+      <button class="${bp.owned ? "btn-owned" : "btn-buy"}"
+        ${bp.owned ? "disabled" : ""}
+        onclick="doBuyBlueprint('${name}')">
+        ${bp.owned ? "Purchased" : "Buy Blueprint"}
+      </button>`;
+    grid.appendChild(div);
+  });
+}
+
+function renderMargins(s) {
+  const tbody = document.getElementById("margins-tbody");
+  tbody.innerHTML = "";
+  ALL_RECIPES.forEach(recipe => {
+    // s.margins uses effective recipes (post-blueprint), matching what the player
+    // actually experiences — not the bare base recipe values.
+    const m  = s.margins[recipe];
+    const er = s.effective_recipes[recipe];
+    if (!m) return;
+    const inputs  = Object.entries(er.inputs).map(([k, v]) => `${v}× ${k}`).join(", ");
+    const outputs = Object.entries(er.outputs).map(([k, v]) => `${v}× ${k}`).join(", ");
+    const margin  = m.margin;
+    // Three-way colour coding: green profit, red loss, gold exact break-even.
+    const cls     = margin > 0 ? "profit" : margin < 0 ? "loss" : "risky";
+    const verdict = margin > 0 ? "Profitable" : margin < 0 ? "Unprofitable" : "Break-even";
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td style="font-weight:700">${recipe}</td>
+      <td style="color:var(--muted); font-size:0.85rem">${inputs}</td>
+      <td>${fmt(m.input_cost)}</td>
+      <td style="color:var(--muted); font-size:0.85rem">${outputs}</td>
+      <td>${fmt(m.output_value)}</td>
+      <td class="${cls}">${fmtS(margin)}</td>
+      <td class="${cls}">${verdict}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function updateCostPreview() {
+  if (!G) return;
+  const item = document.getElementById("market-item").value;
+  const qty  = parseInt(document.getElementById("market-qty").value) || 0;
+  const price = G.market_prices[item] ?? 0;
+  document.getElementById("cost-preview").textContent = fmt(price * qty);
+}
+
+function updateRecipeInfo() {
+  if (!G) return;
+  const recipe = document.getElementById("craft-recipe").value;
+  const er = G.effective_recipes[recipe];
+  if (!er) return;
+  const inputs  = Object.entries(er.inputs).map(([k, v]) => `${v}× ${k}`).join(", ");
+  const outputs = Object.entries(er.outputs).map(([k, v]) => `${v}× ${k}`).join(", ");
+  document.getElementById("recipe-info").innerHTML =
+    `<strong>Inputs:</strong> ${inputs}<br><strong>Outputs:</strong> ${outputs}`;
+}
+
+// ── Tabs ────────────────────────────────────────────────────────────────
+// Pure CSS-class toggle: only one .tab-panel and one .tab-btn carry .active at a time.
+// No history/routing — tabs are purely presentational, state lives in G.
+function switchTab(name) {
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById("tab-" + name).classList.add("active");
+  // Match the button by its visible text rather than a data-attribute to keep the HTML leaner.
+  [...document.querySelectorAll(".tab-btn")]
+    .find(b => b.textContent.toLowerCase().trim() === name)
+    ?.classList.add("active");
+}
+
+// ── Actions ─────────────────────────────────────────────────────────────
+// Each action follows the same pattern:
+//   1. Read form values.
+//   2. Client-side guard (avoids a pointless round trip for obviously bad input).
+//   3. POST to the API.
+//   4. Log the human-readable message returned by the game engine.
+//   5. Call render() with the embedded state snapshot to refresh the UI.
+//
+// Success/failure is inferred from the message prefix rather than HTTP status
+// codes because the game model returns descriptive strings, not exceptions.
+
+async function doBuy() {
+  const item = document.getElementById("market-item").value;
+  const qty  = parseInt(document.getElementById("market-qty").value) || 0;
+  if (qty < 1) { log("Enter a valid quantity.", "log-err"); return; }
+  const r = await api("/api/buy", { item, qty });
+  log(r.message, r.message.startsWith("Bought") ? "log-ok" : "log-err");
+  render(r.state);
+}
+
+async function doSell() {
+  const item = document.getElementById("market-item").value;
+  const qty  = parseInt(document.getElementById("market-qty").value) || 0;
+  if (qty < 1) { log("Enter a valid quantity.", "log-err"); return; }
+  const r = await api("/api/sell", { item, qty });
+  log(r.message, r.message.startsWith("Sold") ? "log-ok" : "log-err");
+  render(r.state);
+}
+
+async function doCraft() {
+  const recipe = document.getElementById("craft-recipe").value;
+  const qty    = parseInt(document.getElementById("craft-qty").value) || 0;
+  if (qty < 1) { log("Enter a valid quantity.", "log-err"); return; }
+  const r = await api("/api/craft", { recipe, qty });
+  log(r.message, r.message.startsWith("Crafted") ? "log-ok" : "log-err");
+  render(r.state);
+}
+
+async function doHire() {
+  const qty = parseInt(document.getElementById("hire-qty").value) || 0;
+  if (qty < 1) { log("Enter a valid quantity.", "log-err"); return; }
+  const r = await api("/api/hire", { qty });
+  log(r.message, r.message.startsWith("Hired") ? "log-ok" : "log-err");
+  render(r.state);
+}
+
+async function doAssign(recipe) {
+  const qty = parseInt(document.getElementById("assign-" + recipe).value) || 0;
+  const r = await api("/api/assign", { recipe, qty });
+  log(r.message, r.message.startsWith("Assigned") ? "log-ok" : "log-err");
+  render(r.state);
+}
+
+async function doBuyBlueprint(name) {
+  const r = await api("/api/buy_blueprint", { name });
+  log(r.message, r.message.startsWith("Bought") ? "log-ok" : "log-err");
+  render(r.state);
+}
+
+async function doNextDay() {
+  const days = parseInt(document.getElementById("days-input").value) || 1;
+  if (days < 1) return;
+  const r = await api("/api/next_day", { days });
+  logDay(r.state.day);
+  log(r.message);
+  if (r.state.bankrupt) log("⚠ BANKRUPTCY RISK: Cash is critically low!", "log-err");
+  render(r.state);
+}
+
+// ── Keyboard shortcut: Enter on Next Day ────────────────────────────────
+document.getElementById("days-input").addEventListener("keydown", e => {
+  if (e.key === "Enter") doNextDay();
+});
+
+// ── Boot ────────────────────────────────────────────────────────────────
+// Immediately-invoked async IIFE: fetch the initial state and paint the UI.
+// updateRecipeInfo() is called explicitly after render() to populate the
+// crafting hint box, which depends on G being set first.
+(async () => {
+  try {
+    const s = await api("/api/state");
+    render(s);
+    updateRecipeInfo();
+  } catch (err) {
+    // Surface network/JSON errors in the game log so they are visible without
+    // having to open DevTools. Common causes: Flask not running, wrong port.
+    log("❌ Could not reach the game server: " + err.message, "log-err");
+    log("Make sure Flask is running: PYTHONPATH=src python main.py", "log-err");
+  }
+})();
+</script>
+</body>
+</html>

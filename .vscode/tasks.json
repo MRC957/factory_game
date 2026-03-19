@@ -1,0 +1,17 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            // Poll Flask until it responds before launching Chrome debug.
+            // This avoids race conditions where the browser opens before the app is up.
+            "label": "wait-for-flask-ready",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-lc",
+                "for i in {1..60}; do curl -fsS http://127.0.0.1:5000/ >/dev/null 2>&1 && exit 0; sleep 0.25; done; echo 'Flask did not become ready on http://127.0.0.1:5000'; exit 1"
+            ],
+            "presentation": { "reveal": "never" }
+        }
+    ]
+}

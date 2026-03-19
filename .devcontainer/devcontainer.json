@@ -1,0 +1,28 @@
+{
+  "name": "game-factory-dev",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.12-bullseye",
+  // Explicitly forward port 5000 so VS Code maps container:5000 → host:5000
+  // without auto-detection. Without this, auto-forwarding can pick a different
+  // host port (e.g. 5001), the browser hits localhost:5000 and either refuses
+  // or hangs, while curl inside the container still works (it skips forwarding).
+  "forwardPorts": [5000],
+  "portsAttributes": {
+    "5000": {
+      "label": "Factory Game",
+      "onAutoForward": "silent"
+    }
+  },
+  "postCreateCommand": "pip install -r requirements.txt",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.analysis.typeCheckingMode": "basic"
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance"
+      ]
+    }
+  }
+}

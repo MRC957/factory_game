@@ -1,0 +1,60 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Flask: Game Factory",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            // Only pause on exceptions that are NOT caught by application code.
+            // Without this, the debugger intercepts Werkzeug's internal routing
+            // exceptions (NotFound, RequestRedirect, etc.) and freezes the
+            // request-handler thread, causing the browser to hang indefinitely.
+            "exceptionOptions": [
+                {
+                    "path": [{"names": ["Python Exceptions"]}],
+                    "breakMode": "unhandled"
+                }
+            ]
+        },
+        {
+            // Attaches the built-in JS debugger to a Chrome window opened against
+            // the running Flask server. Lets you set breakpoints in index.html's
+            // <script> block directly inside VS Code.
+            // webRoot tells the debugger how to map the URL paths served by Flask
+            // back to local source files (templates/ lives inside the package).
+            "name": "Chrome: Game Factory",
+            "type": "pwa-chrome",
+            "request": "launch",
+            "url": "http://localhost:5000",
+            // webRoot is the package root so both templates/ and static/ resolve:
+            // /static/game.js  → src/game_factory/static/game.js  (JS breakpoints)
+            // /         → src/game_factory/templates/index.html  (HTML)
+            "webRoot": "${workspaceFolder}/src/game_factory",
+            // Wait for Flask to be reachable before launching Chrome.
+            // In compound launches, configurations start in parallel; without this,
+            // Chrome can hit localhost before Flask binds and appear to spin forever.
+            "preLaunchTask": "wait-for-flask-ready",
+            // Pause only on uncaught JS errors; caught errors (e.g. failed fetch)
+            // are handled by the game's log UI and should not break execution.
+            "pauseForSourceMap": false,
+            "skipFiles": ["<node_internals>/**"]
+        }
+    ],
+    // Compound launch: starts Flask then Chrome in one click from the debug panel.
+    // Flask and Chrome start in parallel, but Chrome waits via preLaunchTask.
+    "compounds": [
+        {
+            "name": "Full Stack: Flask + Chrome",
+            "configurations": ["Flask: Game Factory", "Chrome: Game Factory"],
+            "stopAll": true
+        }
+    ]
+}
