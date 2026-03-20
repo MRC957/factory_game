@@ -1,0 +1,367 @@
+/**
+ * Tests for all render* functions and updateCostPreview / updateRecipeInfo.
+ */
+import { beforeAll, beforeEach, describe, it, expect, vi } from 'vitest'
+import { createDOM }              from './helpers/dom.js'
+import { loadGame }               from './helpers/load-game.js'
+import { MOCK_STATE, cloneState } from './helpers/mock-state.js'
+
+beforeAll(async () => {
+  createDOM()
+
+  vi.stubGlobal('localStorage', {
+    _s: {},
+    getItem(k)    { return this._s[k] ?? null },
+    setItem(k, v) { this._s[k] = String(v) },
+    removeItem(k) { delete this._s[k] },
+  })
+
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    json: async () => ({ ...MOCK_STATE }),
+  }))
+
+  await loadGame()
+})
+
+beforeEach(() => {
+  // Reset to English and a known state before each rendering test.
+  window.setLanguage('en')
+  window.render({ ...MOCK_STATE })
+})
+
+// ── renderStatusBar ───────────────────────────────────────────────────────────
+
+describe('renderStatusBar()', () => {
+  it('displays the current day', () => {
+    window.renderStatusBar({ ...MOCK_STATE, day: 7 })
+    expect(document.getElementById('stat-day').textContent).toBe('7')
+  })
+
+  it('displays cash as formatted dollar amount', () => {
+    window.renderStatusBar({ ...MOCK_STATE, cash: 1234.56 })
+    expect(document.getElementById('stat-cash').textContent).toMatch(/1,234\.56/)
+  })
+
+  it('applies val-cash class when cash is non-negative', () => {
+    window.renderStatusBar({ ...MOCK_STATE, cash: 0 })
+    expect(document.getElementById('stat-cash').className).toContain('val-cash')
+  })
+
+  it('applies val-warn class when cash is negative', () => {
+    window.renderStatusBar({ ...MOCK_STATE, cash: -50 })
+    expect(document.getElementById('stat-cash').className).toContain('val-warn')
+  })
+
+  it('displays total worker count', () => {
+    window.renderStatusBar({ ...MOCK_STATE, total_workers: 5 })
+    expect(document.getElementById('stat-workers').textContent).toBe('5')
+  })
+
+  it('displays daily salary', () => {
+    window.renderStatusBar({ ...MOCK_STATE, daily_salary: 60.0 })
+    expect(document.getElementById('stat-salary').textContent).toBe('$60.00')
+  })
+
+  it('shows assigned/free worker detail', () => {
+    window.renderStatusBar({ ...MOCK_STATE, assigned_workers: 2, free_workers: 1 })
+    const detail = document.getElementById('stat-workers-detail').textContent
+    expect(detail).toContain('2')
+    expect(detail).toContain('1')
+  })
+})
+
+// ── renderMarket ──────────────────────────────────────────────────────────────
+
+describe('renderMarket()', () => {
+  it('creates one row per item in ALL_ITEMS (6 items)', () => {
+    window.renderMarket(MOCK_STATE)
+    const rows = document.querySelectorAll('#market-tbody tr')
+    expect(rows.length).toBe(6)
+  })
+
+  it('each row displays the item name', () => {
+    window.renderMarket(MOCK_STATE)
+    const rows = Array.from(document.querySelectorAll('#market-tbody tr'))
+    const names = rows.map(tr => tr.cells[0].textContent)
+    expect(names).toContain('ore')
+    expect(names).toContain('widget')
+  })
+
+  it('each row displays a formatted price', () => {
+    window.renderMarket(MOCK_STATE)
+    const rows = document.querySelectorAll('#market-tbody tr')
+    const firstPrice = rows[0].cells[1].textContent
+    expect(firstPrice).toMatch(/^\$\d+\.\d{2}$/)
+  })
+
+  it('highlights the selected item row with market-row-selected class', () => {
+    window.setSelectedMarketItem('ingot')
+    window.renderMarket(MOCK_STATE)
+    const rows = Array.from(document.querySelectorAll('#market-tbody tr'))
+    const ingotRow = rows.find(tr => tr.cells[0].textContent === 'ingot')
+    expect(ingotRow?.className).toContain('market-row-selected')
+  })
+
+  it('only highlights one row at a time', () => {
+    window.setSelectedMarketItem('ore')
+    window.renderMarket(MOCK_STATE)
+    const selected = document.querySelectorAll('#market-tbody .market-row-selected')
+    expect(selected.length).toBe(1)
+  })
+
+  it('rows are clickable (onclick is set)', () => {
+    window.renderMarket(MOCK_STATE)
+    const rows = document.querySelectorAll('#market-tbody tr')
+    for (const row of rows) {
+      expect(typeof row.onclick).toBe('function')
+    }
+  })
+
+  it('shows ↑ arrow for positive price change', () => {
+    const state = cloneState({ price_change: { ore: 5.0, wood: 0, ingot: 0, gear: 0, widget: 0, scrap: 0 } })
+    window.setSelectedMarketItem('ore')
+    window.renderMarket(state)
+    const rows = Array.from(document.querySelectorAll('#market-tbody tr'))
+    const oreRow = rows.find(tr => tr.cells[0].textContent === 'ore')
+    expect(oreRow?.cells[2].textContent).toContain('↑')
+  })
+
+  it('shows ↓ arrow for negative price change', () => {
+    const state = cloneState({ price_change: { ore: -3.0, wood: 0, ingot: 0, gear: 0, widget: 0, scrap: 0 } })
+    window.setSelectedMarketItem('ore')
+    window.renderMarket(state)
+    const rows = Array.from(document.querySelectorAll('#market-tbody tr'))
+    const oreRow = rows.find(tr => tr.cells[0].textContent === 'ore')
+    expect(oreRow?.cells[2].textContent).toContain('↓')
+  })
+})
+
+// ── renderInventory ───────────────────────────────────────────────────────────
+
+describe('renderInventory()', () => {
+  it('creates one card per item in ALL_ITEMS', () => {
+    window.renderInventory(MOCK_STATE, 'inventory-sidebar-grid')
+    const cards = document.querySelectorAll('#inventory-sidebar-grid .inv-item')
+    expect(cards.length).toBe(6)
+  })
+
+  it('each card shows the item name', () => {
+    window.renderInventory(MOCK_STATE, 'inventory-sidebar-grid')
+    const names = Array.from(
+      document.querySelectorAll('#inventory-sidebar-grid .inv-name')
+    ).map(el => el.textContent)
+    expect(names).toContain('ore')
+    expect(names).toContain('scrap')
+  })
+
+  it('each card shows the item quantity', () => {
+    const state = cloneState({ inventory: { ...MOCK_STATE.inventory, ore: 42 } })
+    window.renderInventory(state, 'inventory-sidebar-grid')
+    const cards = Array.from(document.querySelectorAll('#inventory-sidebar-grid .inv-item'))
+    const oreCard = cards.find(c => c.querySelector('.inv-name').textContent === 'ore')
+    expect(oreCard?.querySelector('.inv-qty').textContent).toBe('42')
+  })
+
+  it('returns early if targetId does not exist in DOM', () => {
+    // Should not throw.
+    expect(() => window.renderInventory(MOCK_STATE, 'nonexistent-id')).not.toThrow()
+  })
+})
+
+// ── renderFactory ─────────────────────────────────────────────────────────────
+
+describe('renderFactory()', () => {
+  it('creates one assignment row per recipe (4 recipes)', () => {
+    window.renderFactory(MOCK_STATE)
+    const rows = document.querySelectorAll('#assign-list .assign-row')
+    expect(rows.length).toBe(4)
+  })
+
+  it('each row contains a number input for assignment', () => {
+    window.renderFactory(MOCK_STATE)
+    // There should be 4 inputs: assign-ingot, assign-gear, assign-widget, assign-scrap_mix
+    for (const recipe of ['ingot', 'gear', 'widget', 'scrap_mix']) {
+      const input = document.getElementById(`assign-${recipe}`)
+      expect(input).not.toBeNull()
+      expect(input.type).toBe('number')
+    }
+  })
+
+  it('populates input value from current assignments', () => {
+    const state = cloneState({ assignments: { ingot: 2, gear: 0, widget: 0, scrap_mix: 0 } })
+    window.renderFactory(state)
+    expect(document.getElementById('assign-ingot').value).toBe('2')
+  })
+
+  it('shows "active" label for assigned recipe', () => {
+    const state = cloneState({ assignments: { ingot: 1, gear: 0, widget: 0, scrap_mix: 0 } })
+    window.renderFactory(state)
+    const rows = document.querySelectorAll('#assign-list .assign-row')
+    const ingotRow = Array.from(rows).find(r => r.textContent.includes('ingot'))
+    expect(ingotRow?.textContent).toMatch(/active|1/)
+  })
+
+  it('shows "idle" label for unassigned recipe', () => {
+    const state = cloneState({ assignments: { ingot: 0, gear: 0, widget: 0, scrap_mix: 0 } })
+    window.renderFactory(state)
+    const rows = document.querySelectorAll('#assign-list .assign-row')
+    const gearRow = Array.from(rows).find(r => r.textContent.includes('gear'))
+    expect(gearRow?.textContent).toContain('idle')
+  })
+})
+
+// ── renderBlueprints ──────────────────────────────────────────────────────────
+
+describe('renderBlueprints()', () => {
+  it('creates one card per blueprint (3 blueprints)', () => {
+    window.renderBlueprints(MOCK_STATE)
+    const cards = document.querySelectorAll('#blueprints-grid .bp-card')
+    expect(cards.length).toBe(3)
+  })
+
+  it('shows cost for each blueprint', () => {
+    window.renderBlueprints(MOCK_STATE)
+    const costs = Array.from(document.querySelectorAll('#blueprints-grid .bp-cost'))
+    const costTexts = costs.map(el => el.textContent)
+    expect(costTexts).toContain('$450.00')
+  })
+
+  it('shows blueprint description', () => {
+    window.renderBlueprints(MOCK_STATE)
+    const descs = Array.from(document.querySelectorAll('#blueprints-grid .bp-desc'))
+      .map(el => el.textContent)
+    expect(descs.some(d => d.includes('ore'))).toBe(true)
+  })
+
+  it('marks owned blueprints with "owned" CSS class', () => {
+    const state = cloneState({
+      owned_blueprints: ['smelter_optimization'],
+      blueprints: {
+        ...MOCK_STATE.blueprints,
+        smelter_optimization: { ...MOCK_STATE.blueprints.smelter_optimization, owned: true },
+      },
+    })
+    window.renderBlueprints(state)
+    const owned = document.querySelector('#blueprints-grid .bp-card.owned')
+    expect(owned).not.toBeNull()
+  })
+
+  it('disables buy button for owned blueprint', () => {
+    const state = cloneState({
+      owned_blueprints: ['precision_molds'],
+      blueprints: {
+        ...MOCK_STATE.blueprints,
+        precision_molds: { ...MOCK_STATE.blueprints.precision_molds, owned: true },
+      },
+    })
+    window.renderBlueprints(state)
+    const cards = Array.from(document.querySelectorAll('#blueprints-grid .bp-card'))
+    const pmCard = cards[1] // precision_molds is second
+    const btn = pmCard?.querySelector('button')
+    expect(btn?.disabled).toBe(true)
+  })
+})
+
+// ── renderMargins ─────────────────────────────────────────────────────────────
+
+describe('renderMargins()', () => {
+  it('creates one row per recipe (4 recipes)', () => {
+    window.renderMargins(MOCK_STATE)
+    const rows = document.querySelectorAll('#margins-tbody tr')
+    expect(rows.length).toBe(4)
+  })
+
+  it('shows recipe name in each row', () => {
+    window.renderMargins(MOCK_STATE)
+    const names = Array.from(document.querySelectorAll('#margins-tbody tr td:first-child'))
+      .map(td => td.textContent)
+    expect(names).toContain('ingot')
+    expect(names).toContain('widget')
+  })
+
+  it('applies "profit" class for positive margin', () => {
+    window.renderMargins(MOCK_STATE)
+    // ingot has margin 11.0 → profitable
+    const rows = document.querySelectorAll('#margins-tbody tr')
+    const ingotRow = Array.from(rows).find(tr => tr.cells[0].textContent === 'ingot')
+    const marginCell = ingotRow?.cells[5]
+    expect(marginCell?.className).toBe('profit')
+  })
+
+  it('applies "loss" class for negative margin', () => {
+    window.renderMargins(MOCK_STATE)
+    // scrap_mix has margin -17.0 → unprofitable
+    const rows = document.querySelectorAll('#margins-tbody tr')
+    const scrapRow = Array.from(rows).find(tr => tr.cells[0].textContent === 'scrap_mix')
+    const marginCell = scrapRow?.cells[5]
+    expect(marginCell?.className).toBe('loss')
+  })
+
+  it('shows formatted input cost, output value, and margin', () => {
+    window.renderMargins(MOCK_STATE)
+    const rows = Array.from(document.querySelectorAll('#margins-tbody tr'))
+    const ingotRow = rows.find(tr => tr.cells[0].textContent === 'ingot')
+    // input_cost = 24, output_value = 35, margin = 11
+    expect(ingotRow?.cells[2].textContent).toBe('$24.00')
+    expect(ingotRow?.cells[4].textContent).toBe('$35.00')
+    expect(ingotRow?.cells[5].textContent).toBe('+$11.00')
+  })
+})
+
+// ── updateCostPreview ──────────────────────────────────────────────────────────
+
+describe('updateCostPreview()', () => {
+  beforeEach(() => {
+    window.render({ ...MOCK_STATE })
+    window.setSelectedMarketItem('ore')
+  })
+
+  it('calculates cost from quantity × selected item price', () => {
+    document.getElementById('market-qty').value = '5'
+    window.updateCostPreview()
+    // ore price = 12.0, qty = 5 → $60.00
+    expect(document.getElementById('cost-preview').textContent).toBe('$60.00')
+  })
+
+  it('shows $0.00 when quantity is 0', () => {
+    document.getElementById('market-qty').value = '0'
+    window.updateCostPreview()
+    expect(document.getElementById('cost-preview').textContent).toBe('$0.00')
+  })
+
+  it('updates selected-market-item span text', () => {
+    window.setSelectedMarketItem('gear')
+    window.updateCostPreview()
+    expect(document.getElementById('selected-market-item').textContent).toBe('gear')
+  })
+})
+
+// ── updateRecipeInfo ──────────────────────────────────────────────────────────
+
+describe('updateRecipeInfo()', () => {
+  beforeEach(() => {
+    window.render({ ...MOCK_STATE })
+  })
+
+  it('shows inputs for the selected recipe', () => {
+    document.getElementById('craft-recipe').value = 'ingot'
+    window.updateRecipeInfo()
+    expect(document.getElementById('recipe-info').innerHTML).toContain('ore')
+  })
+
+  it('shows outputs for the selected recipe', () => {
+    document.getElementById('craft-recipe').value = 'gear'
+    window.updateRecipeInfo()
+    const info = document.getElementById('recipe-info').innerHTML
+    expect(info).toContain('gear')
+    expect(info).toContain('Outputs')
+  })
+
+  it('shows inputs and outputs labels', () => {
+    document.getElementById('craft-recipe').value = 'widget'
+    window.updateRecipeInfo()
+    const info = document.getElementById('recipe-info').innerHTML
+    expect(info).toContain('Inputs')
+    expect(info).toContain('Outputs')
+  })
+})

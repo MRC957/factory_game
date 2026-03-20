@@ -65,9 +65,15 @@ def _game_state() -> dict[str, Any]:
         # free_workers is derived here so the client doesn't have to compute it.
         "free_workers": g.total_workers - assigned,
         "worker_hire_cost": g.worker_hire_cost,
+        "worker_fire_fee": g.worker_fire_fee,
         "daily_salary": round(g.total_workers * g.worker_salary, 2),
         "inventory": dict(g.inventory),
         "market_prices": {k: round(v, 2) for k, v in g.market_prices.items()},
+        "price_bounds": {
+            item: {"min": bounds[0], "max": bounds[1]}
+            for item, bounds in g.price_bounds.items()
+        },
+        "price_history": list(g.price_history),
         # price_change is stored as a fraction in the model; convert to % for display.
         "price_change": {k: round(v * 100, 1) for k, v in g.price_change.items()},
         "assignments": dict(g.assignments),
@@ -139,6 +145,13 @@ def api_craft() -> Any:
 def api_hire() -> Any:
     data = request.get_json(force=True)
     msg = _game.hire(int(data["qty"]))
+    return jsonify({"message": msg, "state": _game_state()})
+
+
+@app.route("/api/fire", methods=["POST"])
+def api_fire() -> Any:
+    data = request.get_json(force=True)
+    msg = _game.fire(int(data["qty"]))
     return jsonify({"message": msg, "state": _game_state()})
 
 

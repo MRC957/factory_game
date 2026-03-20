@@ -27,6 +27,7 @@ class FactoryGame:
         self.cash = 500.0
 
         self.worker_hire_cost = 150.0
+        self.worker_fire_fee = 40.0
         self.worker_salary = 20.0
         self.total_workers = 0
         self.assignments: Dict[str, int] = {"ingot": 0, "gear": 0, "widget": 0, "scrap_mix": 0}
@@ -48,7 +49,16 @@ class FactoryGame:
             "widget": 190.0,
             "scrap": 4.0,
         }
+        self.price_bounds: Dict[str, tuple[float, float]] = {
+            "ore": (6.0, 28.0),
+            "wood": (5.0, 24.0),
+            "ingot": (18.0, 78.0),
+            "gear": (45.0, 170.0),
+            "widget": (95.0, 380.0),
+            "scrap": (1.5, 12.0),
+        }
         self.price_change: Dict[str, float] = {k: 0.0 for k in self.market_prices}
+        self.price_history: list[dict[str, float | int]] = []
 
         self.recipes = {
             "ingot": Recipe("ingot", {"ore": 2}, {"ingot": 1}),
@@ -69,6 +79,13 @@ class FactoryGame:
             ),
         }
         self.owned_blueprints: set[str] = set()
+        self._record_price_history()
+
+    def _record_price_history(self) -> None:
+        snapshot: dict[str, float | int] = {"day": self.day}
+        for item, price in self.market_prices.items():
+            snapshot[item] = round(price, 2)
+        self.price_history.append(snapshot)
 
     def recipe_effective(self, recipe_name: str) -> Recipe:
         recipe = self.recipes[recipe_name]
@@ -160,6 +177,32 @@ class FactoryGame:
         self.total_workers += qty
         return f"Hired {qty} worker(s) for ${total_cost:.2f}."
 
+    def fire(self, qty: int) -> str:
+        if qty <= 0:
+            return "Quantity must be > 0."
+        if qty > self.total_workers:
+            return f"Cannot fire {qty}. Only {self.total_workers} worker(s) available."
+
+        fire_cost = qty * self.worker_fire_fee
+        if self.cash < fire_cost:
+            return f"Not enough cash to fire workers. Need ${fire_cost:.2f}, have ${self.cash:.2f}."
+
+        to_unassign = max(0, sum(self.assignments.values()) - (self.total_workers - qty))
+        if to_unassign > 0:
+            for recipe_name in sorted(self.assignments, key=lambda name: self.assignments[name], reverse=True):
+                current = self.assignments[recipe_name]
+                if current <= 0:
+                    continue
+                reduction = min(current, to_unassign)
+                self.assignments[recipe_name] -= reduction
+                to_unassign -= reduction
+                if to_unassign == 0:
+                    break
+
+        self.total_workers -= qty
+        self.cash -= fire_cost
+        return f"Fired {qty} worker(s) for ${fire_cost:.2f}."
+
     def assign(self, recipe_name: str, qty: int) -> str:
         if recipe_name not in self.recipes:
             return f"Unknown recipe '{recipe_name}'."
@@ -190,7 +233,9 @@ class FactoryGame:
     def _update_prices(self) -> None:
         for item, current in list(self.market_prices.items()):
             drift = self.rng.uniform(-0.08, 0.08)
-            new_price = max(1.0, current * (1.0 + drift))
+            min_price, max_price = self.price_bounds[item]
+            new_price = current * (1.0 + drift)
+            new_price = max(min_price, min(max_price, new_price))
             self.market_prices[item] = round(new_price, 2)
             self.price_change[item] = drift
 
@@ -209,6 +254,7 @@ class FactoryGame:
 
         self._update_prices()
         self.day += 1
+        self._record_price_history()
 
         if self.cash < 0:
             lines.append("Warning: negative cash. Sell stock or cut costs quickly.")
@@ -261,6 +307,7 @@ class FactoryGame:
             "  sell <item> <qty>\n"
             "  craft <recipe> <qty>\n"
             "  hire <qty>\n"
+            "  fire <qty>\n"
             "  assign <recipe> <workers>\n"
             "  blueprints\n"
             "  blueprint buy <name>\n"
@@ -314,6 +361,8 @@ def run_cli() -> None:
             print(game.craft_manual(parts[1], int(parts[2])))
         elif cmd == "hire" and len(parts) == 2:
             print(game.hire(int(parts[1])))
+        elif cmd == "fire" and len(parts) == 2:
+            print(game.fire(int(parts[1])))
         elif cmd == "assign" and len(parts) == 3:
             print(game.assign(parts[1], int(parts[2])))
         elif cmd == "blueprints":
