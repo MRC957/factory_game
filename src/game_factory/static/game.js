@@ -179,8 +179,6 @@ function applyTranslations() {
   document.getElementById("th-price").textContent = t("price");
   document.getElementById("th-change").textContent = t("change");
   document.getElementById("buy-sell-title").textContent = t("buySell");
-  document.getElementById("lbl-market-item").textContent = t("item");
-  document.getElementById("lbl-selected-item").textContent = t("selectedItem") + ":";
   document.getElementById("lbl-market-qty").textContent = t("quantity");
   document.getElementById("btn-max-buy").textContent = t("maxBuy");
   document.getElementById("btn-max-sell").textContent = t("maxSell");
@@ -233,12 +231,34 @@ function toggleInventorySidebar() {
 function setSelectedMarketItem(item) {
   if (!allItems().includes(item)) return;
   selectedMarketItem = item;
-  const out = document.getElementById("selected-market-item");
-  if (out) out.textContent = item;
   if (G) {
     renderMarket(G);
     updateCostPreview();
   }
+}
+
+function parseMarketQty(rawValue, fallback = 0) {
+  const digitsOnly = String(rawValue ?? "").replace(/\D+/g, "");
+  if (!digitsOnly) return fallback;
+  return Math.max(0, Number.parseInt(digitsOnly, 10));
+}
+
+function onMarketQtyInput() {
+  const input = document.getElementById("market-qty");
+  if (!input) return;
+  const normalized = parseMarketQty(input.value, 0);
+  if (input.value !== String(normalized)) {
+    input.value = String(normalized);
+  }
+  updateCostPreview();
+}
+
+function adjustMarketQty(delta) {
+  const input = document.getElementById("market-qty");
+  if (!input) return;
+  const current = parseMarketQty(input.value, 0);
+  input.value = String(Math.max(0, current + delta));
+  updateCostPreview();
 }
 
 function setLanguage(lang) {
@@ -556,8 +576,7 @@ function renderMargins(s) {
 function updateCostPreview() {
   if (!G) return;
   const item = selectedMarketItem;
-  document.getElementById("selected-market-item").textContent = item;
-  const qty  = parseInt(document.getElementById("market-qty").value) || 0;
+  const qty  = parseMarketQty(document.getElementById("market-qty").value, 0);
   const price = G.market_prices[item] ?? 0;
   document.getElementById("cost-preview").textContent = fmt(price * qty);
   if (priceHistoryVisible) {

@@ -335,10 +335,11 @@ describe('updateCostPreview()', () => {
     expect(document.getElementById('cost-preview').textContent).toBe('$0.00')
   })
 
-  it('updates selected-market-item span text', () => {
+  it('highlights the selected market row', () => {
     window.setSelectedMarketItem('gear')
     window.updateCostPreview()
-    expect(document.getElementById('selected-market-item').textContent).toBe('gear')
+    const selectedRow = document.querySelector('#market-tbody tr.market-row-selected')
+    expect(selectedRow?.textContent).toContain('gear')
   })
 })
 

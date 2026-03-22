@@ -32,9 +32,14 @@ beforeAll(async () => {
 // ── setSelectedMarketItem ─────────────────────────────────────────────────────
 
 describe('setSelectedMarketItem()', () => {
-  it('updates the #selected-market-item text', () => {
+  const selectedRowName = () => {
+    const selectedRow = document.querySelector('#market-tbody tr.market-row-selected')
+    return selectedRow?.querySelector('.item-name')?.textContent ?? null
+  }
+
+  it('updates selected row when item changes', () => {
     window.setSelectedMarketItem('gear')
-    expect(document.getElementById('selected-market-item').textContent).toBe('gear')
+    expect(selectedRowName()).toBe('gear')
   })
 
   it('highlights the correct row in the market table', () => {
@@ -57,15 +62,15 @@ describe('setSelectedMarketItem()', () => {
   it('accepts all valid items', () => {
     for (const item of ['ore', 'wood', 'ingot', 'gear', 'widget', 'scrap']) {
       window.setSelectedMarketItem(item)
-      expect(document.getElementById('selected-market-item').textContent).toBe(item)
+      expect(selectedRowName()).toBe(item)
     }
   })
 
   it('ignores unknown items', () => {
     window.setSelectedMarketItem('ore')
     window.setSelectedMarketItem('unobtanium')
-    // Should still show 'ore'
-    expect(document.getElementById('selected-market-item').textContent).toBe('ore')
+    // Should still keep 'ore' selected
+    expect(selectedRowName()).toBe('ore')
   })
 })
 

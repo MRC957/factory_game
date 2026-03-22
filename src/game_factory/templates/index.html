@@ -152,6 +152,40 @@
   }
   input[type=number]:focus, select:focus { border-color: var(--gold); }
   .field { margin-bottom: 10px; }
+  .qty-stepper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 260px;
+  }
+  .qty-stepper input[type=text] {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    text-align: center;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text);
+    padding: 7px 10px;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .qty-stepper input[type=text]:focus { border-color: var(--gold); }
+  .qty-stepper-btn {
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    line-height: 1;
+    background: var(--accent);
+    color: var(--text);
+  }
 
   /* ── Buttons ───────────────────────────────────────────────────────── */
   button {
@@ -381,12 +415,12 @@
       <div class="card">
         <div class="card-title" id="buy-sell-title">Buy / Sell</div>
         <div class="field">
-          <label id="lbl-market-item">Item</label>
-          <div class="recipe-info"><strong id="lbl-selected-item">Selected item:</strong> <span id="selected-market-item">ore</span></div>
-        </div>
-        <div class="field">
           <label for="market-qty" id="lbl-market-qty">Quantity</label>
-          <input type="number" id="market-qty" value="1" min="0" max="9999" oninput="updateCostPreview()">
+          <div class="qty-stepper">
+            <button type="button" class="qty-stepper-btn" id="btn-qty-dec" onclick="adjustMarketQty(-1)" aria-label="Decrease quantity">−</button>
+            <input type="text" id="market-qty" value="1" inputmode="numeric" oninput="onMarketQtyInput()" aria-label="Market quantity">
+            <button type="button" class="qty-stepper-btn" id="btn-qty-inc" onclick="adjustMarketQty(1)" aria-label="Increase quantity">+</button>
+          </div>
         </div>
         <div class="btn-row" style="margin-bottom:8px;">
           <button class="btn-primary" id="btn-max-buy" onclick="setMarketMax('buy')">Max Buy</button>
