@@ -1,6 +1,6 @@
 # Game Factory MVP
 
-A Python CLI factory game MVP: buy raw materials, craft products, hire workers for automation, unlock blueprints, and react to dynamic market prices.
+A Python web factory game MVP with a browser GUI: buy raw materials, craft products, hire workers for automation, unlock blueprints, and react to dynamic market prices.
 
 ## Run locally
 
@@ -13,6 +13,8 @@ $env:PYTHONPATH="src"
 python main.py
 ```
 
+Then open your browser at `http://localhost:5000`.
+
 ## Run in devcontainer
 
 - Open this folder in VS Code.
@@ -23,21 +25,15 @@ python main.py
 PYTHONPATH=src python main.py
 ```
 
-## Commands
+Then open `http://localhost:5000`.
 
-- `help`
-- `status`
-- `market`
-- `margins`
-- `buy <item> <qty>`
-- `sell <item> <qty>`
-- `craft <recipe> <qty>`
-- `hire <qty>`
-- `assign <recipe> <workers>`
-- `blueprints`
-- `blueprint buy <name>`
-- `next [days]`
-- `quit`
+## Gameplay (GUI)
+
+- Use the **Market** tab to buy/sell items.
+- Use the **Factory** tab for manual crafting and worker assignment.
+- Use the **Blueprints** tab to purchase production upgrades.
+- Use the **Margins** tab to inspect current recipe profitability.
+- Use the bottom bar to advance days and view activity logs.
 
 ## MVP mechanics covered
 
@@ -46,7 +42,7 @@ PYTHONPATH=src python main.py
 - Blueprint upgrades for recipe efficiency/output.
 - Not-always-profitable recipes.
 - Slightly dynamic daily prices.
-- Financial, market, and margin dashboards.
+- Financial, market, and margin dashboards in the web UI.
 
 ## Save system and sessions
 
