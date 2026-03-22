@@ -1,7 +1,7 @@
 /**
  * Minimal DOM fixture with every element ID that game.js references.
  * Call createDOM() before evaluating game.js so all getElementById() calls
- * and the module-level event listener on #days-input succeed.
+ * and the module-level event listener on #hours-input succeed.
  */
 export function createDOM() {
   document.body.innerHTML = `
@@ -9,6 +9,10 @@ export function createDOM() {
     <span id="title"></span>
     <span id="lbl-day"></span>
     <span id="stat-day"></span>
+    <span id="lbl-time"></span>
+    <span id="stat-time"></span>
+    <span id="lbl-market-status"></span>
+    <span id="stat-market-status" class="stat-value"></span>
     <span id="lbl-cash"></span>
     <span id="stat-cash" class="stat-value"></span>
     <span id="lbl-workers"></span>
@@ -115,9 +119,14 @@ export function createDOM() {
 
     <!-- Bottom bar -->
     <div  id="log-box"></div>
-    <label id="days-label"></label>
-    <input id="days-input" type="number" value="1" />
-    <button id="btn-next-day"></button>
+    <label id="hours-label"></label>
+    <select id="hours-input">
+      <option value="1">+1h</option>
+      <option value="4">+4h</option>
+      <option value="8">+8h</option>
+      <option value="rest">Rest of day</option>
+    </select>
+    <button id="btn-advance-time"></button>
     <input id="save-slot" type="text" value="default" />
     <button id="btn-save-game"></button>
     <button id="btn-load-game"></button>

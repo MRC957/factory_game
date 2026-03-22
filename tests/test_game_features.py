@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from game_factory.game import FactoryGame
 
 
@@ -50,3 +52,36 @@ def test_market_price_history_starts_and_grows_each_day() -> None:
     for entry in game.price_history:
         for item in game.market_prices:
             assert item in entry
+
+
+def test_buy_at_night_uses_emergency_surcharge() -> None:
+    game = FactoryGame(seed=5)
+    game.hour = 22
+    price = game.market_prices["ore"]
+    cash_before = game.cash
+
+    message = game.buy("ore", 1)
+
+    assert "night-market surcharge" in message
+    assert game.cash == pytest.approx(cash_before - (price * 1.30))
+    assert game.hour == 23
+
+
+def test_sell_is_blocked_when_market_closed() -> None:
+    game = FactoryGame(seed=5)
+    game.inventory["ore"] = 3
+    game.hour = 21
+
+    message = game.sell("ore", 1)
+
+    assert message.startswith("Market is closed")
+    assert game.inventory["ore"] == 3
+
+
+def test_advance_time_rolls_over_day_and_resets_hour() -> None:
+    game = FactoryGame(seed=5)
+    game.hour = 20
+    game.advance_time(6)
+
+    assert game.day == 2
+    assert game.hour == 2

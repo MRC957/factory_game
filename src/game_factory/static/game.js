@@ -39,6 +39,10 @@ const I18N = {
   en: {
     title: "⚙ FACTORY GAME",
     day: "Day",
+    time: "Time",
+    marketStatus: "Market",
+    marketOpen: "Open",
+    marketClosed: "Closed",
     cash: "Cash",
     workers: "Workers",
     dailySalary: "Daily salary",
@@ -79,8 +83,9 @@ const I18N = {
     fireWorkers: "Fire Workers",
     automationAssignment: "Automation Assignment",
     automationNote: "Workers produce 1 batch per assigned worker per day automatically.",
-    daysToAdvance: "Days to advance",
-    nextDay: "⏭ Next Day",
+    hoursToAdvance: "Hours to advance",
+    advanceTime: "⏭ Advance Time",
+    restOfDay: "Rest of day",
     save: "Save",
     load: "Load",
     saveSlot: "Slot",
@@ -97,6 +102,10 @@ const I18N = {
   fr: {
     title: "⚙ USINE GAME",
     day: "Jour",
+    time: "Heure",
+    marketStatus: "Marché",
+    marketOpen: "Ouvert",
+    marketClosed: "Fermé",
     cash: "Trésorerie",
     workers: "Ouvriers",
     dailySalary: "Salaire journalier",
@@ -137,8 +146,9 @@ const I18N = {
     fireWorkers: "Licencier",
     automationAssignment: "Affectation automatique",
     automationNote: "Chaque ouvrier affecté produit 1 lot par jour automatiquement.",
-    daysToAdvance: "Jours à avancer",
-    nextDay: "⏭ Jour suivant",
+    hoursToAdvance: "Heures à avancer",
+    advanceTime: "⏭ Avancer le temps",
+    restOfDay: "Fin de journée",
     save: "Sauvegarder",
     load: "Charger",
     saveSlot: "Slot",
@@ -166,6 +176,8 @@ function applyTranslations() {
   document.title = t("title");
   document.getElementById("title").textContent = t("title");
   document.getElementById("lbl-day").textContent = t("day");
+  document.getElementById("lbl-time").textContent = t("time");
+  document.getElementById("lbl-market-status").textContent = t("marketStatus");
   document.getElementById("lbl-cash").textContent = t("cash");
   document.getElementById("lbl-workers").textContent = t("workers");
   document.getElementById("lbl-salary").textContent = t("dailySalary");
@@ -203,8 +215,13 @@ function applyTranslations() {
   document.getElementById("btn-fire").textContent = t("fireWorkers");
   document.getElementById("automation-title").textContent = t("automationAssignment");
   document.getElementById("automation-note").textContent = t("automationNote");
-  document.getElementById("days-label").textContent = t("daysToAdvance");
-  document.getElementById("btn-next-day").textContent = t("nextDay");
+  document.getElementById("hours-label").textContent = t("hoursToAdvance");
+  document.getElementById("btn-advance-time").textContent = t("advanceTime");
+  const hoursInput = document.getElementById("hours-input");
+  if (hoursInput) {
+    const restOption = hoursInput.querySelector('option[value="rest"]');
+    if (restOption) restOption.textContent = t("restOfDay");
+  }
   document.getElementById("btn-save-game").textContent = t("save");
   document.getElementById("btn-load-game").textContent = t("load");
   document.getElementById("save-slot").placeholder = t("saveSlot");
@@ -361,6 +378,11 @@ function renderAction(statePatch, sections = {}) {
 
 function renderStatusBar(s) {
   document.getElementById("stat-day").textContent = s.day;
+  document.getElementById("stat-time").textContent = s.clock ?? `${String(s.hour ?? 0).padStart(2, "0")}:00`;
+  const marketStatus = document.getElementById("stat-market-status");
+  const isOpen = Boolean(s.market_is_open);
+  marketStatus.textContent = isOpen ? t("marketOpen") : t("marketClosed");
+  marketStatus.className = "stat-value " + (isOpen ? "val-cash" : "val-warn");
   const cashEl = document.getElementById("stat-cash");
   cashEl.textContent = fmtCash(s.cash);
   cashEl.className = "stat-value " + (s.cash >= 0 ? "val-cash" : "val-warn");
@@ -680,34 +702,20 @@ function switchTab(name) {
 
 async function doBuy() {
   const item = selectedMarketItem;
-  const qty  = parseInt(document.getElementById("market-qty").value) || 0;
+  const qty  = parseMarketQty(document.getElementById("market-qty").value, 0);
   if (qty < 1) { log("Enter a valid quantity.", "log-err"); return; }
   const r = await api("/api/buy", { item, qty });
   log(r.message, r.message.startsWith("Bought") ? "log-ok" : "log-err");
-  renderAction(r.state, {
-    status: true,
-    market: true,
-    inventory: true,
-    chart: priceHistoryVisible,
-    costPreview: true,
-    recipeInfo: true,
-  });
+  render(r.state);
 }
 
 async function doSell() {
   const item = selectedMarketItem;
-  const qty  = parseInt(document.getElementById("market-qty").value) || 0;
+  const qty  = parseMarketQty(document.getElementById("market-qty").value, 0);
   if (qty < 1) { log("Enter a valid quantity.", "log-err"); return; }
   const r = await api("/api/sell", { item, qty });
   log(r.message, r.message.startsWith("Sold") ? "log-ok" : "log-err");
-  renderAction(r.state, {
-    status: true,
-    market: true,
-    inventory: true,
-    chart: priceHistoryVisible,
-    costPreview: true,
-    recipeInfo: true,
-  });
+  render(r.state);
 }
 
 async function doCraft() {
@@ -716,13 +724,7 @@ async function doCraft() {
   if (qty < 1) { log("Enter a valid quantity.", "log-err"); return; }
   const r = await api("/api/craft", { recipe, qty });
   log(r.message, r.message.startsWith("Crafted") ? "log-ok" : "log-err");
-  renderAction(r.state, {
-    status: true,
-    inventory: true,
-    factory: true,
-    costPreview: true,
-    recipeInfo: true,
-  });
+  render(r.state);
 }
 
 async function doHire() {
@@ -730,10 +732,7 @@ async function doHire() {
   if (qty < 1) { log("Enter a valid quantity.", "log-err"); return; }
   const r = await api("/api/hire", { qty });
   log(r.message, r.message.startsWith("Hired") ? "log-ok" : "log-err");
-  renderAction(r.state, {
-    status: true,
-    factory: true,
-  });
+  render(r.state);
 }
 
 async function doFire() {
@@ -741,10 +740,7 @@ async function doFire() {
   if (qty < 1) { log("Enter a valid quantity.", "log-err"); return; }
   const r = await api("/api/fire", { qty });
   log(r.message, r.message.startsWith("Fired") ? "log-ok" : "log-err");
-  renderAction(r.state, {
-    status: true,
-    factory: true,
-  });
+  render(r.state);
 }
 
 async function doAssign(recipe) {
@@ -777,19 +773,32 @@ async function doLoad() {
   render(r.state);
 }
 
-async function doNextDay() {
-  const days = parseInt(document.getElementById("days-input").value) || 1;
-  if (days < 1) return;
-  const r = await api("/api/next_day", { days });
-  logDay(r.state.day);
+function resolveAdvanceHours() {
+  if (!G) return 1;
+  const value = document.getElementById("hours-input")?.value ?? "1";
+  if (value === "rest") {
+    const remaining = 24 - (G.hour ?? 0);
+    return Math.max(1, remaining);
+  }
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+async function doAdvanceTime() {
+  const hours = resolveAdvanceHours();
+  const prevDay = G?.day ?? null;
+  const r = await api("/api/advance_time", { hours });
+  if (prevDay !== null && r.state.day > prevDay) {
+    logDay(r.state.day);
+  }
   log(r.message);
   if (r.state.bankrupt) log("⚠ BANKRUPTCY RISK: Cash is critically low!", "log-err");
   render(r.state);
 }
 
-// ── Keyboard shortcut: Enter on Next Day ────────────────────────────────
-document.getElementById("days-input").addEventListener("keydown", e => {
-  if (e.key === "Enter") doNextDay();
+// ── Keyboard shortcut: Enter on Advance Time ────────────────────────────
+document.getElementById("hours-input").addEventListener("keydown", e => {
+  if (e.key === "Enter") doAdvanceTime();
 });
 
 // ── Boot ────────────────────────────────────────────────────────────────

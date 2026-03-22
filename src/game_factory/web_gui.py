@@ -16,7 +16,14 @@ from typing import Any
 
 from flask import Flask, jsonify, render_template, request, session
 
-from game_factory.game import FactoryGame, ITEM_CATALOG, ITEM_IDS, RECIPE_IDS
+from game_factory.game import (
+    FactoryGame,
+    ITEM_CATALOG,
+    ITEM_IDS,
+    MARKET_CLOSE_HOUR,
+    MARKET_OPEN_HOUR,
+    RECIPE_IDS,
+)
 
 # Single in-process game instance.  Fine for a single-player desktop MVP;
 # replace with a session-keyed store if multi-user support is needed.
@@ -103,6 +110,11 @@ def _game_state(compact: bool = False) -> dict[str, Any]:
     assigned = sum(g.assignments.values())
     state: dict[str, Any] = {
         "day": g.day,
+        "hour": g.hour,
+        "clock": f"{g.hour:02d}:00",
+        "market_open_hour": MARKET_OPEN_HOUR,
+        "market_close_hour": MARKET_CLOSE_HOUR,
+        "market_is_open": MARKET_OPEN_HOUR <= g.hour < MARKET_CLOSE_HOUR,
         "cash": round(g.cash, 2),
         "items": list(ITEM_IDS),
         "recipes": list(RECIPE_IDS),
@@ -234,6 +246,14 @@ def api_next_day() -> Any:
     # Join multi-day summaries with newlines so the client log renders them as
     # separate lines without needing to know how many days were advanced.
     return jsonify({"message": "\n".join(messages), "state": _game_state()})
+
+
+@app.route("/api/advance_time", methods=["POST"])
+def api_advance_time() -> Any:
+    data = request.get_json(force=True) or {}
+    hours = max(1, int(data.get("hours", 1)))
+    message = _current_game().advance_time(hours)
+    return jsonify({"message": message, "state": _game_state()})
 
 
 @app.route("/api/save", methods=["POST"])

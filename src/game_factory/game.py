@@ -39,11 +39,23 @@ RECIPE_CATALOG: dict[str, Recipe] = {
 }
 RECIPE_IDS: tuple[str, ...] = tuple(RECIPE_CATALOG.keys())
 
+HOURS_PER_DAY = 24
+MARKET_OPEN_HOUR = 8
+MARKET_CLOSE_HOUR = 18
+NIGHT_MARKET_SURCHARGE = 0.30
+MANUAL_CRAFT_HOURS: dict[str, int] = {
+    "ingot": 1,
+    "scrap_mix": 1,
+    "gear": 2,
+    "widget": 4,
+}
+
 
 class FactoryGame:
     def __init__(self, seed: int | None = None) -> None:
         self.rng = random.Random(seed)
         self.day = 1
+        self.hour = MARKET_OPEN_HOUR
         self.cash = 500.0
 
         self.worker_hire_cost = 150.0
@@ -91,6 +103,7 @@ class FactoryGame:
         return {
             "version": 1,
             "day": self.day,
+            "hour": self.hour,
             "cash": self.cash,
             "total_workers": self.total_workers,
             "assignments": dict(self.assignments),
@@ -106,6 +119,7 @@ class FactoryGame:
     def from_save_dict(cls, payload: dict[str, Any]) -> FactoryGame:
         g = cls()
         g.day = int(payload.get("day", g.day))
+        g.hour = int(payload.get("hour", g.hour)) % HOURS_PER_DAY
         g.cash = float(payload.get("cash", g.cash))
         g.total_workers = int(payload.get("total_workers", g.total_workers))
 
@@ -176,6 +190,57 @@ class FactoryGame:
 
         return Recipe(recipe.name, inputs, outputs)
 
+    def _format_clock(self) -> str:
+        return f"Day {self.day}, {self.hour:02d}:00"
+
+    def _is_market_open(self) -> bool:
+        return MARKET_OPEN_HOUR <= self.hour < MARKET_CLOSE_HOUR
+
+    def _run_day_rollover(self) -> list[str]:
+        lines: list[str] = []
+        for recipe_name, workers in self.assignments.items():
+            if workers <= 0:
+                continue
+            recipe = self.recipe_effective(recipe_name)
+            crafted = self._apply_recipe(recipe, workers)
+            lines.append(
+                f"Automation {recipe_name}: {crafted}/{workers} batch(es)")
+
+        salaries = self.total_workers * self.worker_salary
+        self.cash -= salaries
+        lines.append(f"Salaries paid: ${salaries:.2f}")
+
+        self._update_prices()
+        self.day += 1
+        self._record_price_history()
+
+        if self.cash < 0:
+            lines.append(
+                "Warning: negative cash. Sell stock or cut costs quickly.")
+        return lines
+
+    def advance_time(self, hours: int) -> str:
+        if hours <= 0:
+            return "Hours must be > 0."
+
+        remaining = hours
+        lines: list[str] = [f"Advanced {hours}h."]
+        while remaining > 0:
+            until_rollover = HOURS_PER_DAY - self.hour
+            step = min(remaining, until_rollover)
+            self.hour += step
+            remaining -= step
+
+            if self.hour >= HOURS_PER_DAY:
+                self.hour = 0
+                lines.extend(self._run_day_rollover())
+
+        lines.append(f"Current time: {self._format_clock()}.")
+        return "\n".join(lines)
+
+    def _consume_action_time(self, hours: int) -> str:
+        return self.advance_time(hours)
+
     def _max_batches(self, recipe: Recipe) -> int:
         possible = float("inf")
         for item, qty in recipe.inputs.items():
@@ -204,26 +269,40 @@ class FactoryGame:
             return f"Unknown item '{item}'."
         if qty <= 0:
             return "Quantity must be > 0."
-        total = self.market_prices[item] * qty
+
+        base_total = self.market_prices[item] * qty
+        is_night_market = not self._is_market_open()
+        total = base_total * \
+            (1.0 + NIGHT_MARKET_SURCHARGE) if is_night_market else base_total
         if self.cash < total:
             return f"Not enough cash. Need ${total:.2f}, have ${self.cash:.2f}."
 
         self.cash -= total
         self.inventory[item] += qty
-        return f"Bought {qty} {item} for ${total:.2f}."
+        if is_night_market:
+            return (
+                f"Bought {qty} {item} for ${total:.2f} (night-market surcharge +{int(NIGHT_MARKET_SURCHARGE * 100)}%)."
+                f"\n{self._consume_action_time(1)}"
+            )
+        return f"Bought {qty} {item} for ${total:.2f}.\n{self._consume_action_time(1)}"
 
     def sell(self, item: str, qty: int) -> str:
         if item not in self.market_prices:
             return f"Unknown item '{item}'."
         if qty <= 0:
             return "Quantity must be > 0."
+        if not self._is_market_open():
+            return (
+                "Market is closed (08:00–18:00). "
+                "Selling is unavailable outside business hours."
+            )
         if self.inventory[item] < qty:
             return f"Not enough {item} in inventory."
 
         total = self.market_prices[item] * qty
         self.inventory[item] -= qty
         self.cash += total
-        return f"Sold {qty} {item} for ${total:.2f}."
+        return f"Sold {qty} {item} for ${total:.2f}.\n{self._consume_action_time(1)}"
 
     def craft_manual(self, recipe_name: str, qty: int) -> str:
         if recipe_name not in self.recipes:
@@ -235,9 +314,11 @@ class FactoryGame:
         done = self._apply_recipe(recipe, qty)
         if done == 0:
             return "Missing required inputs."
+        per_batch_hours = MANUAL_CRAFT_HOURS.get(recipe_name, 2)
+        time_report = self._consume_action_time(per_batch_hours * done)
         if done < qty:
-            return f"Crafted {done}/{qty} batches of {recipe_name} (inputs limited)."
-        return f"Crafted {done} batches of {recipe_name}."
+            return f"Crafted {done}/{qty} batches of {recipe_name} (inputs limited).\n{time_report}"
+        return f"Crafted {done} batches of {recipe_name}.\n{time_report}"
 
     def hire(self, qty: int) -> str:
         if qty <= 0:
@@ -248,7 +329,7 @@ class FactoryGame:
 
         self.cash -= total_cost
         self.total_workers += qty
-        return f"Hired {qty} worker(s) for ${total_cost:.2f}."
+        return f"Hired {qty} worker(s) for ${total_cost:.2f}.\n{self._consume_action_time(1)}"
 
     def fire(self, qty: int) -> str:
         if qty <= 0:
@@ -275,7 +356,7 @@ class FactoryGame:
 
         self.total_workers -= qty
         self.cash -= fire_cost
-        return f"Fired {qty} worker(s) for ${fire_cost:.2f}."
+        return f"Fired {qty} worker(s) for ${fire_cost:.2f}.\n{self._consume_action_time(1)}"
 
     def assign(self, recipe_name: str, qty: int) -> str:
         if recipe_name not in self.recipes:
@@ -315,25 +396,4 @@ class FactoryGame:
             self.price_change[item] = drift
 
     def next_day(self) -> str:
-        lines: list[str] = []
-        for recipe_name, workers in self.assignments.items():
-            if workers <= 0:
-                continue
-            recipe = self.recipe_effective(recipe_name)
-            crafted = self._apply_recipe(recipe, workers)
-            lines.append(
-                f"Automation {recipe_name}: {crafted}/{workers} batch(es)")
-
-        salaries = self.total_workers * self.worker_salary
-        self.cash -= salaries
-        lines.append(f"Salaries paid: ${salaries:.2f}")
-
-        self._update_prices()
-        self.day += 1
-        self._record_price_history()
-
-        if self.cash < 0:
-            lines.append(
-                "Warning: negative cash. Sell stock or cut costs quickly.")
-
-        return "\n".join(lines)
+        return self.advance_time(HOURS_PER_DAY)

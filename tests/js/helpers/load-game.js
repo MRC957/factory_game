@@ -7,7 +7,7 @@
  * those functions, so the full module works correctly.
  *
  * IMPORTANT: call createDOM() and stub fetch BEFORE calling loadGame().
- * The script has a module-level event listener on #days-input and an IIFE
+ * The script has a module-level event listener on #hours-input and an IIFE
  * that calls fetch("/api/state") — both must find their dependencies ready.
  */
 import { readFileSync } from 'node:fs'

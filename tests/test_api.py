@@ -67,7 +67,8 @@ class TestApiState:
     def test_contains_core_fields(self, client):
         payload = client.get("/api/state").get_json()
         required = [
-            "day", "cash", "items", "recipes", "item_icons", "total_workers", "assigned_workers", "free_workers",
+            "day", "hour", "clock", "market_open_hour", "market_close_hour", "market_is_open",
+            "cash", "items", "recipes", "item_icons", "total_workers", "assigned_workers", "free_workers",
             "worker_hire_cost", "worker_fire_fee", "daily_salary",
             "inventory", "market_prices", "price_bounds", "price_history",
             "price_change", "assignments", "owned_blueprints",
@@ -79,6 +80,11 @@ class TestApiState:
     def test_day_starts_at_1(self, client):
         payload = client.get("/api/state").get_json()
         assert payload["day"] == 1
+
+    def test_hour_starts_at_market_open(self, client):
+        payload = client.get("/api/state").get_json()
+        assert payload["hour"] == 8
+        assert payload["clock"] == "08:00"
 
     def test_cash_starts_at_500(self, client):
         payload = client.get("/api/state").get_json()
@@ -166,6 +172,19 @@ class TestApiBuy:
     def test_unknown_item_returns_error(self, client):
         resp = client.post("/api/buy", json={"item": "gold", "qty": 1})
         assert "Unknown item" in resp.get_json()["message"]
+
+
+class TestApiAdvanceTime:
+    def test_advances_hour(self, client):
+        resp = client.post("/api/advance_time", json={"hours": 4})
+        payload = resp.get_json()
+        assert resp.status_code == 200
+        assert payload["state"]["hour"] == 12
+
+    def test_rollover_advances_day(self, client):
+        client.post("/api/advance_time", json={"hours": 20})
+        payload = client.get("/api/state").get_json()
+        assert payload["day"] == 2
 
 
 # ── /api/sell ────────────────────────────────────────────────────────────────

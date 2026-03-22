@@ -4,6 +4,11 @@
  */
 export const MOCK_STATE = {
   day: 1,
+  hour: 8,
+  clock: "08:00",
+  market_open_hour: 8,
+  market_close_hour: 18,
+  market_is_open: true,
   cash: 500.0,
   items: ["ore", "wood", "ingot", "gear", "widget", "scrap"],
   recipes: ["ingot", "gear", "widget", "scrap_mix"],

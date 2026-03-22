@@ -25,6 +25,8 @@ def test_state_includes_price_bounds_and_history(client) -> None:
 
     assert "price_bounds" in payload
     assert "price_history" in payload
+    assert "hour" in payload
+    assert "clock" in payload
     assert "worker_fire_fee" in payload
     assert payload["price_history"][0]["day"] == 1
 

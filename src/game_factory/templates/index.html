@@ -332,7 +332,7 @@
   .log-ok  { color: var(--green); }
   .log-err { color: var(--red); }
   #next-day-wrap { display: flex; align-items: center; flex-direction: column; gap: 6px; }
-  #days-input { width: 80px; text-align: center; }
+  #hours-input { width: 120px; text-align: center; }
   .days-label { font-size: 0.72rem; color: var(--muted); text-align: center; }
   .save-row { display: flex; gap: 6px; align-items: center; }
   #save-slot {
@@ -355,6 +355,16 @@
   <div class="stat-block">
     <span class="stat-label" id="lbl-day">Day</span>
     <span class="stat-value val-day" id="stat-day">1</span>
+  </div>
+  <span class="sep">|</span>
+  <div class="stat-block">
+    <span class="stat-label" id="lbl-time">Time</span>
+    <span class="stat-value" id="stat-time">08:00</span>
+  </div>
+  <span class="sep">|</span>
+  <div class="stat-block">
+    <span class="stat-label" id="lbl-market-status">Market</span>
+    <span class="stat-value" id="stat-market-status">Open</span>
   </div>
   <span class="sep">|</span>
   <div class="stat-block">

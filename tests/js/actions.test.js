@@ -1,6 +1,6 @@
 /**
  * Tests for async action functions (doBuy, doSell, doCraft, doHire, doFire,
- * doAssign, doBuyBlueprint, doNextDay).
+ * doAssign, doBuyBlueprint, doAdvanceTime).
  *
  * Each action is tested for:
  *  - Correct API path + payload sent to fetch.
@@ -103,8 +103,8 @@ describe('doBuy()', () => {
     expect(entry).not.toBeNull()
   })
 
-  it('does not call fetch when quantity is negative', async () => {
-    document.getElementById('market-qty').value = '-1'
+  it('does not call fetch when quantity is non-numeric', async () => {
+    document.getElementById('market-qty').value = 'abc'
     await window.doBuy()
     expect(fetchMock).not.toHaveBeenCalled()
   })
@@ -383,74 +383,73 @@ describe('doLoad()', () => {
   })
 })
 
-// ── doNextDay ─────────────────────────────────────────────────────────────────
+// ── doAdvanceTime ────────────────────────────────────────────────────────────
 
-describe('doNextDay()', () => {
-  it('POSTs to /api/next_day with the number of days', async () => {
+describe('doAdvanceTime()', () => {
+  it('POSTs to /api/advance_time with selected hours', async () => {
     fetchMock.mockResolvedValueOnce({
-      json: async () => apiResponse('Salaries paid: $0.00', { day: 2 }),
+      json: async () => apiResponse('Advanced 4h.', { day: 1, hour: 12, clock: '12:00' }),
     })
-    document.getElementById('days-input').value = '3'
-    await window.doNextDay()
+    document.getElementById('hours-input').value = '4'
+    await window.doAdvanceTime()
     const [url, opts] = fetchMock.mock.calls[0]
-    expect(url).toBe('/api/next_day')
-    expect(JSON.parse(opts.body)).toMatchObject({ days: 3 })
+    expect(url).toBe('/api/advance_time')
+    expect(JSON.parse(opts.body)).toMatchObject({ hours: 4 })
   })
 
-  it('logs a day separator', async () => {
+  it('logs a day separator when rolling to next day', async () => {
     const nextState = cloneState({ day: 2 })
     fetchMock.mockResolvedValueOnce({
       json: async () => ({ message: 'Salaries paid: $0.00', state: nextState }),
     })
-    document.getElementById('days-input').value = '1'
-    await window.doNextDay()
+    document.getElementById('hours-input').value = 'rest'
+    await window.doAdvanceTime()
     const daySep = document.querySelector('#log-box .log-day')
     expect(daySep).not.toBeNull()
     expect(daySep.textContent).toContain('2')  // new day number
   })
 
-  it('logs the day summary message', async () => {
+  it('logs the time advance summary message', async () => {
     const nextState = cloneState({ day: 2 })
     fetchMock.mockResolvedValueOnce({
-      json: async () => ({ message: 'Salaries paid: $40.00', state: nextState }),
+      json: async () => ({ message: 'Advanced 1h.', state: nextState }),
     })
-    document.getElementById('days-input').value = '1'
-    await window.doNextDay()
-    expect(logEntries().some(t => t.includes('Salaries paid'))).toBe(true)
+    document.getElementById('hours-input').value = '1'
+    await window.doAdvanceTime()
+    expect(logEntries().some(t => t.includes('Advanced'))).toBe(true)
   })
 
   it('logs a bankruptcy warning when state.bankrupt is true', async () => {
     const bankruptState = cloneState({ day: 2, bankrupt: true, cash: -600 })
     fetchMock.mockResolvedValueOnce({
-      json: async () => ({ message: 'Salaries paid: $20.00', state: bankruptState }),
+      json: async () => ({ message: 'Advanced 8h.', state: bankruptState }),
     })
-    document.getElementById('days-input').value = '1'
-    await window.doNextDay()
+    document.getElementById('hours-input').value = '8'
+    await window.doAdvanceTime()
     const warnEntry = Array.from(document.querySelectorAll('#log-box .log-err'))
       .find(el => el.textContent.includes('BANKRUPTCY'))
     expect(warnEntry).not.toBeNull()
   })
 
-  it('defaults to 1 day when value is 0 (parseInt fallback)', async () => {
-    // parseInt('0') || 1 === 1, so fetch IS called with days:1
+  it('defaults to 1 hour when value is invalid', async () => {
     const nextState = cloneState({ day: 2 })
     fetchMock.mockResolvedValueOnce({
-      json: async () => ({ message: 'Salaries paid: $0.00', state: nextState }),
+      json: async () => ({ message: 'Advanced 1h.', state: nextState }),
     })
-    document.getElementById('days-input').value = '0'
-    await window.doNextDay()
+    document.getElementById('hours-input').value = 'abc'
+    await window.doAdvanceTime()
     expect(fetchMock).toHaveBeenCalledOnce()
     const body = JSON.parse(fetchMock.mock.calls[0][1].body)
-    expect(body.days).toBe(1)
+    expect(body.hours).toBe(1)
   })
 
-  it('updates the day counter in the status bar', async () => {
-    const nextState = cloneState({ day: 5 })
+  it('updates the time in the status bar', async () => {
+    const nextState = cloneState({ day: 1, hour: 16, clock: '16:00' })
     fetchMock.mockResolvedValueOnce({
-      json: async () => ({ message: 'Salaries paid: $0.00', state: nextState }),
+      json: async () => ({ message: 'Advanced 8h.', state: nextState }),
     })
-    document.getElementById('days-input').value = '4'
-    await window.doNextDay()
-    expect(document.getElementById('stat-day').textContent).toBe('5')
+    document.getElementById('hours-input').value = '8'
+    await window.doAdvanceTime()
+    expect(document.getElementById('stat-time').textContent).toBe('16:00')
   })
 })

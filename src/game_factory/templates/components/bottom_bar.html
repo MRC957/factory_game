@@ -1,9 +1,14 @@
 <div id="bottom-bar">
   <div id="log-box"><div class="log-entry log-ok">Factory Game started. Good luck!</div></div>
   <div id="next-day-wrap">
-    <div class="days-label" id="days-label">Days to advance</div>
-    <input type="number" id="days-input" value="1" min="1" max="30">
-    <button class="btn-nextday" id="btn-next-day" onclick="doNextDay()">⏭ Next Day</button>
+    <div class="days-label" id="hours-label">Hours to advance</div>
+    <select id="hours-input" aria-label="Hours to advance">
+      <option value="1">+1h</option>
+      <option value="4">+4h</option>
+      <option value="8">+8h</option>
+      <option value="rest">Rest of day</option>
+    </select>
+    <button class="btn-nextday" id="btn-advance-time" onclick="doAdvanceTime()">⏭ Advance Time</button>
     <div class="save-row">
       <input type="text" id="save-slot" value="default" maxlength="24" aria-label="Save slot">
       <button class="btn-primary" id="btn-save-game" onclick="doSave()">Save</button>

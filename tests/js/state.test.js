@@ -249,8 +249,8 @@ describe('applyTranslations()', () => {
     window.setLanguage('en')
   })
 
-  it('sets the Next Day button label', () => {
+  it('sets the Advance Time button label', () => {
     window.setLanguage('en')
-    expect(document.getElementById('btn-next-day').textContent).toBe('⏭ Next Day')
+    expect(document.getElementById('btn-advance-time').textContent).toBe('⏭ Advance Time')
   })
 })
