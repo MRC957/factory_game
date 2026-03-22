@@ -542,8 +542,12 @@ function updateRecipeInfo() {
   const recipe = document.getElementById("craft-recipe").value;
   const er = G.effective_recipes[recipe];
   if (!er) return;
-  const inputs  = Object.entries(er.inputs).map(([k, v]) => `${v}× ${k}`).join(", ");
-  const outputs = Object.entries(er.outputs).map(([k, v]) => `${v}× ${k}`).join(", ");
+  const inputs  = Object.entries(er.inputs)
+    .map(([k, v]) => `${v}× ${itemIcon(k)}<span class="item-name">${k}</span>`)
+    .join(", ");
+  const outputs = Object.entries(er.outputs)
+    .map(([k, v]) => `${v}× ${itemIcon(k)}<span class="item-name">${k}</span>`)
+    .join(", ");
   document.getElementById("recipe-info").innerHTML =
     `<strong>${t("inputs")}:</strong> ${inputs}<br><strong>${t("outputs")}:</strong> ${outputs}`;
 }
