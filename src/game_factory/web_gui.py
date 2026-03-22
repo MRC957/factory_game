@@ -2,8 +2,8 @@
 
 Architecture: thin REST layer over FactoryGame.
 The frontend is a single HTML page that drives the game entirely through
-JSON API calls — no page reloads.  Every mutating endpoint returns the full
-game state so the client never needs a separate /api/state poll after an action.
+JSON API calls — no page reloads.  Mutating endpoints return a state snapshot
+so the client can merge and re-render without a separate /api/state poll.
 """
 from __future__ import annotations
 
@@ -93,16 +93,15 @@ def _compute_margins() -> dict[str, Any]:
     return result
 
 
-def _game_state() -> dict[str, Any]:
+def _game_state(compact: bool = False) -> dict[str, Any]:
     """Serialise the full game state to a plain JSON-compatible dict.
 
-    This is the single source of truth sent to the frontend after every action.
-    Keeping it complete (rather than returning diffs) keeps the client simple:
-    each render() call replaces the entire UI from this snapshot.
+    This is the source of truth sent to the frontend.
+    compact=True omits heavier derived/history fields for frequent actions.
     """
     g = _current_game()
     assigned = sum(g.assignments.values())
-    return {
+    state: dict[str, Any] = {
         "day": g.day,
         "cash": round(g.cash, 2),
         "items": list(ITEM_IDS),
@@ -117,43 +116,48 @@ def _game_state() -> dict[str, Any]:
         "daily_salary": round(g.total_workers * g.worker_salary, 2),
         "inventory": dict(g.inventory),
         "market_prices": {k: round(v, 2) for k, v in g.market_prices.items()},
-        "price_bounds": {
-            item: {"min": bounds[0], "max": bounds[1]}
-            for item, bounds in g.price_bounds.items()
-        },
-        "price_history": list(g.price_history),
         # price_change is stored as a fraction in the model; convert to % for display.
         "price_change": {k: round(v * 100, 1) for k, v in g.price_change.items()},
         "assignments": dict(g.assignments),
         "owned_blueprints": list(g.owned_blueprints),
-        # Flatten blueprint metadata + ownership into one dict so the client
-        # can render the shop without a separate lookup.
-        "blueprints": {
-            name: {
-                "cost": bp.cost,
-                "description": bp.description,
-                "owned": name in g.owned_blueprints,
-            }
-            for name, bp in g.blueprints.items()
-        },
-        # Effective recipes (post-blueprint) are sent so the UI can show the
-        # actual inputs/outputs the player will experience, not the base values.
-        "effective_recipes": {
-            name: {
-                "inputs": dict(g.recipe_effective(name).inputs),
-                "outputs": dict(g.recipe_effective(name).outputs),
-            }
-            for name in g.recipes
-        },
-        "margins": _compute_margins(),
         # Bankruptcy threshold is -$500 (a small grace buffer below zero).
         "bankrupt": g.cash < -500,
     }
+    if compact:
+        return state
+
+    # Flatten blueprint metadata + ownership into one dict so the client
+    # can render the shop without a separate lookup.
+    state["blueprints"] = {
+        name: {
+            "cost": bp.cost,
+            "description": bp.description,
+            "owned": name in g.owned_blueprints,
+        }
+        for name, bp in g.blueprints.items()
+    }
+    # Effective recipes (post-blueprint) are sent so the UI can show the
+    # actual inputs/outputs the player will experience, not the base values.
+    state["effective_recipes"] = {
+        name: {
+            "inputs": dict(g.recipe_effective(name).inputs),
+            "outputs": dict(g.recipe_effective(name).outputs),
+        }
+        for name in g.recipes
+    }
+    state["margins"] = _compute_margins()
+
+    state["price_bounds"] = {
+        item: {"min": bounds[0], "max": bounds[1]}
+        for item, bounds in g.price_bounds.items()
+    }
+    state["price_history"] = list(g.price_history)
+    return state
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
 # Convention: every mutating endpoint returns {"message": str, "state": dict}
-# so the client can update both the activity log and the full UI in one round trip.
+# so the client can update the activity log and merge UI state in one round trip.
 
 @app.route("/")
 def index() -> Any:
@@ -163,7 +167,7 @@ def index() -> Any:
 
 @app.route("/api/state")
 def api_state() -> Any:
-    # Used only on initial page load; subsequent actions embed state in their response.
+    # Used on initial page load (and refresh), returning the full snapshot.
     return jsonify(_game_state())
 
 
@@ -172,42 +176,42 @@ def api_buy() -> Any:
     data = request.get_json(force=True)
     # str/int casts guard against the browser sending unexpected JSON types.
     msg = _current_game().buy(str(data["item"]), int(data["qty"]))
-    return jsonify({"message": msg, "state": _game_state()})
+    return jsonify({"message": msg, "state": _game_state(compact=True)})
 
 
 @app.route("/api/sell", methods=["POST"])
 def api_sell() -> Any:
     data = request.get_json(force=True)
     msg = _current_game().sell(str(data["item"]), int(data["qty"]))
-    return jsonify({"message": msg, "state": _game_state()})
+    return jsonify({"message": msg, "state": _game_state(compact=True)})
 
 
 @app.route("/api/craft", methods=["POST"])
 def api_craft() -> Any:
     data = request.get_json(force=True)
     msg = _current_game().craft_manual(str(data["recipe"]), int(data["qty"]))
-    return jsonify({"message": msg, "state": _game_state()})
+    return jsonify({"message": msg, "state": _game_state(compact=True)})
 
 
 @app.route("/api/hire", methods=["POST"])
 def api_hire() -> Any:
     data = request.get_json(force=True)
     msg = _current_game().hire(int(data["qty"]))
-    return jsonify({"message": msg, "state": _game_state()})
+    return jsonify({"message": msg, "state": _game_state(compact=True)})
 
 
 @app.route("/api/fire", methods=["POST"])
 def api_fire() -> Any:
     data = request.get_json(force=True)
     msg = _current_game().fire(int(data["qty"]))
-    return jsonify({"message": msg, "state": _game_state()})
+    return jsonify({"message": msg, "state": _game_state(compact=True)})
 
 
 @app.route("/api/assign", methods=["POST"])
 def api_assign() -> Any:
     data = request.get_json(force=True)
     msg = _current_game().assign(str(data["recipe"]), int(data["qty"]))
-    return jsonify({"message": msg, "state": _game_state()})
+    return jsonify({"message": msg, "state": _game_state(compact=True)})
 
 
 @app.route("/api/buy_blueprint", methods=["POST"])
@@ -239,7 +243,7 @@ def api_save() -> Any:
     path = _save_file_path(slot)
     payload = _current_game().to_save_dict()
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    return jsonify({"message": f"Game saved to slot '{slot}'.", "state": _game_state()})
+    return jsonify({"message": f"Game saved to slot '{slot}'.", "state": _game_state(compact=True)})
 
 
 @app.route("/api/load", methods=["POST"])

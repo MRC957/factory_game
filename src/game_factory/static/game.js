@@ -288,27 +288,55 @@ function logDay(day) {
 // Thin fetch wrapper: GET when body is null, POST+JSON otherwise.
 // All action endpoints return {message, state}; /api/state just returns the state dict.
 async function api(path, body = null) {
+  const startedAt = performance.now();
   const opts = body
     ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
     : { method: "GET" };
   const res = await fetch(path, opts);
-  return res.json();
+  const payload = await res.json();
+  const elapsed = performance.now() - startedAt;
+  console.debug(`[api] ${path} ${elapsed.toFixed(1)}ms`);
+  return payload;
 }
 
 // ── Render ──────────────────────────────────────────────────────────────
 // Master render: update G then repaint every section of the UI.
 // Full re-renders are cheap here (small DOM, no virtual-DOM diffing needed).
 function render(state) {
-  G = state;
-  renderStatusBar(state);
-  renderMarket(state);
-  renderInventory(state, "inventory-sidebar-grid");
-  renderFactory(state);   // rebuilds the assignment inputs with current worker counts
-  renderBlueprints(state);
-  renderMargins(state);
-  renderPriceChart(state);
+  mergeStatePatch(state);
+  renderStatusBar(G);
+  renderMarket(G);
+  renderInventory(G, "inventory-sidebar-grid");
+  renderFactory(G);   // rebuilds the assignment inputs with current worker counts
+  renderBlueprints(G);
+  renderMargins(G);
+  renderPriceChart(G);
   updateCostPreview();    // recalculate the buy/sell cost preview with new prices
   updateRecipeInfo();     // refresh the crafting recipe breakdown
+}
+
+function mergeStatePatch(statePatch) {
+  if (!statePatch) return;
+  if (!G) {
+    G = statePatch;
+    return;
+  }
+  G = { ...G, ...statePatch };
+}
+
+function renderAction(statePatch, sections = {}) {
+  mergeStatePatch(statePatch);
+  if (!G) return;
+
+  if (sections.status) renderStatusBar(G);
+  if (sections.market) renderMarket(G);
+  if (sections.inventory) renderInventory(G, "inventory-sidebar-grid");
+  if (sections.factory) renderFactory(G);
+  if (sections.blueprints) renderBlueprints(G);
+  if (sections.margins) renderMargins(G);
+  if (sections.chart) renderPriceChart(G);
+  if (sections.costPreview) updateCostPreview();
+  if (sections.recipeInfo) updateRecipeInfo();
 }
 
 function renderStatusBar(s) {
@@ -637,7 +665,14 @@ async function doBuy() {
   if (qty < 1) { log("Enter a valid quantity.", "log-err"); return; }
   const r = await api("/api/buy", { item, qty });
   log(r.message, r.message.startsWith("Bought") ? "log-ok" : "log-err");
-  render(r.state);
+  renderAction(r.state, {
+    status: true,
+    market: true,
+    inventory: true,
+    chart: priceHistoryVisible,
+    costPreview: true,
+    recipeInfo: true,
+  });
 }
 
 async function doSell() {
@@ -646,7 +681,14 @@ async function doSell() {
   if (qty < 1) { log("Enter a valid quantity.", "log-err"); return; }
   const r = await api("/api/sell", { item, qty });
   log(r.message, r.message.startsWith("Sold") ? "log-ok" : "log-err");
-  render(r.state);
+  renderAction(r.state, {
+    status: true,
+    market: true,
+    inventory: true,
+    chart: priceHistoryVisible,
+    costPreview: true,
+    recipeInfo: true,
+  });
 }
 
 async function doCraft() {
@@ -655,7 +697,13 @@ async function doCraft() {
   if (qty < 1) { log("Enter a valid quantity.", "log-err"); return; }
   const r = await api("/api/craft", { recipe, qty });
   log(r.message, r.message.startsWith("Crafted") ? "log-ok" : "log-err");
-  render(r.state);
+  renderAction(r.state, {
+    status: true,
+    inventory: true,
+    factory: true,
+    costPreview: true,
+    recipeInfo: true,
+  });
 }
 
 async function doHire() {
@@ -663,7 +711,10 @@ async function doHire() {
   if (qty < 1) { log("Enter a valid quantity.", "log-err"); return; }
   const r = await api("/api/hire", { qty });
   log(r.message, r.message.startsWith("Hired") ? "log-ok" : "log-err");
-  render(r.state);
+  renderAction(r.state, {
+    status: true,
+    factory: true,
+  });
 }
 
 async function doFire() {
@@ -671,14 +722,20 @@ async function doFire() {
   if (qty < 1) { log("Enter a valid quantity.", "log-err"); return; }
   const r = await api("/api/fire", { qty });
   log(r.message, r.message.startsWith("Fired") ? "log-ok" : "log-err");
-  render(r.state);
+  renderAction(r.state, {
+    status: true,
+    factory: true,
+  });
 }
 
 async function doAssign(recipe) {
   const qty = parseInt(document.getElementById("assign-" + recipe).value) || 0;
   const r = await api("/api/assign", { recipe, qty });
   log(r.message, r.message.startsWith("Assigned") ? "log-ok" : "log-err");
-  render(r.state);
+  renderAction(r.state, {
+    status: true,
+    factory: true,
+  });
 }
 
 async function doBuyBlueprint(name) {
@@ -691,7 +748,7 @@ async function doSave() {
   const slot = document.getElementById("save-slot").value || "default";
   const r = await api("/api/save", { slot });
   log(r.message, r.message.startsWith("Game saved") ? "log-ok" : "log-err");
-  render(r.state);
+  renderAction(r.state, { status: true });
 }
 
 async function doLoad() {
