@@ -5,6 +5,16 @@
 export const MOCK_STATE = {
   day: 1,
   cash: 500.0,
+  items: ["ore", "wood", "ingot", "gear", "widget", "scrap"],
+  recipes: ["ingot", "gear", "widget", "scrap_mix"],
+  item_icons: {
+    ore: "🪨",
+    wood: "🪵",
+    ingot: "🔩",
+    gear: "⚙️",
+    widget: "📦",
+    scrap: "🗑️",
+  },
   total_workers: 2,
   assigned_workers: 1,
   free_workers: 1,

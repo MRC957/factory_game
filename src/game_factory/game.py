@@ -21,6 +21,25 @@ class Blueprint:
     description: str
 
 
+ITEM_CATALOG: dict[str, dict[str, float | str]] = {
+    "ore": {"icon": "🪨", "base_price": 12.0, "min_price": 6.0, "max_price": 28.0},
+    "wood": {"icon": "🪵", "base_price": 9.0, "min_price": 5.0, "max_price": 24.0},
+    "ingot": {"icon": "🔩", "base_price": 35.0, "min_price": 18.0, "max_price": 78.0},
+    "gear": {"icon": "⚙️", "base_price": 85.0, "min_price": 45.0, "max_price": 170.0},
+    "widget": {"icon": "📦", "base_price": 190.0, "min_price": 95.0, "max_price": 380.0},
+    "scrap": {"icon": "🗑️", "base_price": 4.0, "min_price": 1.5, "max_price": 12.0},
+}
+ITEM_IDS: tuple[str, ...] = tuple(ITEM_CATALOG.keys())
+
+RECIPE_CATALOG: dict[str, Recipe] = {
+    "ingot": Recipe("ingot", {"ore": 2}, {"ingot": 1}),
+    "gear": Recipe("gear", {"ingot": 2, "wood": 1}, {"gear": 1}),
+    "widget": Recipe("widget", {"gear": 1, "ingot": 1}, {"widget": 1}),
+    "scrap_mix": Recipe("scrap_mix", {"ore": 1, "wood": 1}, {"scrap": 1}),
+}
+RECIPE_IDS: tuple[str, ...] = tuple(RECIPE_CATALOG.keys())
+
+
 class FactoryGame:
     def __init__(self, seed: int | None = None) -> None:
         self.rng = random.Random(seed)
@@ -31,42 +50,28 @@ class FactoryGame:
         self.worker_fire_fee = 40.0
         self.worker_salary = 20.0
         self.total_workers = 0
-        self.assignments: Dict[str, int] = {"ingot": 0, "gear": 0, "widget": 0, "scrap_mix": 0}
+        self.assignments: Dict[str, int] = {
+            recipe_name: 0 for recipe_name in RECIPE_CATALOG}
 
         self.inventory: Dict[str, int] = {
-            "ore": 0,
-            "wood": 0,
-            "ingot": 0,
-            "gear": 0,
-            "widget": 0,
-            "scrap": 0,
-        }
+            item_name: 0 for item_name in ITEM_CATALOG}
 
         self.market_prices: Dict[str, float] = {
-            "ore": 12.0,
-            "wood": 9.0,
-            "ingot": 35.0,
-            "gear": 85.0,
-            "widget": 190.0,
-            "scrap": 4.0,
+            item_name: float(item["base_price"])
+            for item_name, item in ITEM_CATALOG.items()
         }
         self.price_bounds: Dict[str, tuple[float, float]] = {
-            "ore": (6.0, 28.0),
-            "wood": (5.0, 24.0),
-            "ingot": (18.0, 78.0),
-            "gear": (45.0, 170.0),
-            "widget": (95.0, 380.0),
-            "scrap": (1.5, 12.0),
+            item_name: (
+                float(item["min_price"]),
+                float(item["max_price"]),
+            )
+            for item_name, item in ITEM_CATALOG.items()
         }
-        self.price_change: Dict[str, float] = {k: 0.0 for k in self.market_prices}
+        self.price_change: Dict[str, float] = {
+            k: 0.0 for k in self.market_prices}
         self.price_history: list[dict[str, float | int]] = []
 
-        self.recipes = {
-            "ingot": Recipe("ingot", {"ore": 2}, {"ingot": 1}),
-            "gear": Recipe("gear", {"ingot": 2, "wood": 1}, {"gear": 1}),
-            "widget": Recipe("widget", {"gear": 1, "ingot": 1}, {"widget": 1}),
-            "scrap_mix": Recipe("scrap_mix", {"ore": 1, "wood": 1}, {"scrap": 1}),
-        }
+        self.recipes = dict(RECIPE_CATALOG)
 
         self.blueprints = {
             "smelter_optimization": Blueprint(
@@ -107,22 +112,26 @@ class FactoryGame:
         saved_assignments = payload.get("assignments", {})
         if isinstance(saved_assignments, dict):
             for key in g.assignments:
-                g.assignments[key] = int(saved_assignments.get(key, g.assignments[key]))
+                g.assignments[key] = int(
+                    saved_assignments.get(key, g.assignments[key]))
 
         saved_inventory = payload.get("inventory", {})
         if isinstance(saved_inventory, dict):
             for key in g.inventory:
-                g.inventory[key] = int(saved_inventory.get(key, g.inventory[key]))
+                g.inventory[key] = int(
+                    saved_inventory.get(key, g.inventory[key]))
 
         saved_prices = payload.get("market_prices", {})
         if isinstance(saved_prices, dict):
             for key in g.market_prices:
-                g.market_prices[key] = float(saved_prices.get(key, g.market_prices[key]))
+                g.market_prices[key] = float(
+                    saved_prices.get(key, g.market_prices[key]))
 
         saved_change = payload.get("price_change", {})
         if isinstance(saved_change, dict):
             for key in g.price_change:
-                g.price_change[key] = float(saved_change.get(key, g.price_change[key]))
+                g.price_change[key] = float(
+                    saved_change.get(key, g.price_change[key]))
 
         saved_history = payload.get("price_history", [])
         if isinstance(saved_history, list) and saved_history:
@@ -133,7 +142,8 @@ class FactoryGame:
 
         saved_blueprints = payload.get("owned_blueprints", [])
         if isinstance(saved_blueprints, list):
-            g.owned_blueprints = {bp for bp in saved_blueprints if bp in g.blueprints}
+            g.owned_blueprints = {
+                bp for bp in saved_blueprints if bp in g.blueprints}
 
         rng_state = payload.get("rng_state")
         if isinstance(rng_state, str):
@@ -250,7 +260,8 @@ class FactoryGame:
         if self.cash < fire_cost:
             return f"Not enough cash to fire workers. Need ${fire_cost:.2f}, have ${self.cash:.2f}."
 
-        to_unassign = max(0, sum(self.assignments.values()) - (self.total_workers - qty))
+        to_unassign = max(0, sum(self.assignments.values()) -
+                          (self.total_workers - qty))
         if to_unassign > 0:
             for recipe_name in sorted(self.assignments, key=lambda name: self.assignments[name], reverse=True):
                 current = self.assignments[recipe_name]
@@ -272,7 +283,8 @@ class FactoryGame:
         if qty < 0:
             return "Assigned workers must be >= 0."
 
-        others = sum(v for k, v in self.assignments.items() if k != recipe_name)
+        others = sum(v for k, v in self.assignments.items()
+                     if k != recipe_name)
         if others + qty > self.total_workers:
             free = self.total_workers - others
             return f"Not enough workers. Max assignable to {recipe_name}: {free}."
@@ -309,7 +321,8 @@ class FactoryGame:
                 continue
             recipe = self.recipe_effective(recipe_name)
             crafted = self._apply_recipe(recipe, workers)
-            lines.append(f"Automation {recipe_name}: {crafted}/{workers} batch(es)")
+            lines.append(
+                f"Automation {recipe_name}: {crafted}/{workers} batch(es)")
 
         salaries = self.total_workers * self.worker_salary
         self.cash -= salaries
@@ -320,124 +333,7 @@ class FactoryGame:
         self._record_price_history()
 
         if self.cash < 0:
-            lines.append("Warning: negative cash. Sell stock or cut costs quickly.")
-
-        return "\n".join(lines)
-
-    def dashboard_status(self) -> str:
-        assigned = sum(self.assignments.values())
-        free = self.total_workers - assigned
-        inv = ", ".join(f"{k}:{v}" for k, v in self.inventory.items())
-        bps = ", ".join(sorted(self.owned_blueprints)) or "none"
-        return (
-            f"Day {self.day}\n"
-            f"Cash: ${self.cash:.2f}\n"
-            f"Workers: {self.total_workers} (assigned: {assigned}, free: {free})\n"
-            f"Daily salary burn: ${self.total_workers * self.worker_salary:.2f}\n"
-            f"Inventory: {inv}\n"
-            f"Owned blueprints: {bps}"
-        )
-
-    def dashboard_market(self) -> str:
-        lines = ["Market prices:"]
-        for item in sorted(self.market_prices.keys()):
-            arrow = "↑" if self.price_change[item] > 0 else "↓" if self.price_change[item] < 0 else "→"
-            pct = self.price_change[item] * 100
-            lines.append(f"- {item:>6}: ${self.market_prices[item]:>7.2f} ({arrow} {pct:+.1f}%)")
-        return "\n".join(lines)
-
-    def dashboard_margins(self) -> str:
-        lines = ["Estimated recipe margins (using current market):"]
-        for recipe_name in self.recipes:
-            recipe = self.recipe_effective(recipe_name)
-            input_cost = sum(self.market_prices[item] * qty for item, qty in recipe.inputs.items())
-            output_value = sum(self.market_prices[item] * qty for item, qty in recipe.outputs.items())
-            margin = output_value - input_cost
-            verdict = "profitable" if margin > 0 else "risky" if margin == 0 else "unprofitable"
             lines.append(
-                f"- {recipe_name:>9}: in=${input_cost:>7.2f} out=${output_value:>7.2f} margin=${margin:>7.2f} ({verdict})"
-            )
+                "Warning: negative cash. Sell stock or cut costs quickly.")
+
         return "\n".join(lines)
-
-    def help_text(self) -> str:
-        return (
-            "Commands:\n"
-            "  help\n"
-            "  status\n"
-            "  market\n"
-            "  margins\n"
-            "  buy <item> <qty>\n"
-            "  sell <item> <qty>\n"
-            "  craft <recipe> <qty>\n"
-            "  hire <qty>\n"
-            "  fire <qty>\n"
-            "  assign <recipe> <workers>\n"
-            "  blueprints\n"
-            "  blueprint buy <name>\n"
-            "  next [days]\n"
-            "  quit\n"
-        )
-
-    def blueprint_text(self) -> str:
-        lines = ["Blueprint shop:"]
-        for name, bp in self.blueprints.items():
-            owned = "(owned)" if name in self.owned_blueprints else ""
-            lines.append(f"- {name}: ${bp.cost:.2f} - {bp.description} {owned}".rstrip())
-        return "\n".join(lines)
-
-
-def run_cli() -> None:
-    game = FactoryGame()
-    print("Factory Game MVP")
-    print("Type 'help' for commands.")
-
-    while True:
-        try:
-            raw = input("> ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\nBye.")
-            return
-
-        if not raw:
-            continue
-
-        parts = raw.split()
-        cmd = parts[0].lower()
-
-        if cmd in {"quit", "exit"}:
-            print("Thanks for playing.")
-            return
-
-        if cmd == "help":
-            print(game.help_text())
-        elif cmd == "status":
-            print(game.dashboard_status())
-        elif cmd == "market":
-            print(game.dashboard_market())
-        elif cmd == "margins":
-            print(game.dashboard_margins())
-        elif cmd == "buy" and len(parts) == 3:
-            print(game.buy(parts[1], int(parts[2])))
-        elif cmd == "sell" and len(parts) == 3:
-            print(game.sell(parts[1], int(parts[2])))
-        elif cmd == "craft" and len(parts) == 3:
-            print(game.craft_manual(parts[1], int(parts[2])))
-        elif cmd == "hire" and len(parts) == 2:
-            print(game.hire(int(parts[1])))
-        elif cmd == "fire" and len(parts) == 2:
-            print(game.fire(int(parts[1])))
-        elif cmd == "assign" and len(parts) == 3:
-            print(game.assign(parts[1], int(parts[2])))
-        elif cmd == "blueprints":
-            print(game.blueprint_text())
-        elif cmd == "blueprint" and len(parts) == 3 and parts[1] == "buy":
-            print(game.buy_blueprint(parts[2]))
-        elif cmd == "next":
-            days = int(parts[1]) if len(parts) == 2 else 1
-            if days <= 0:
-                print("Days must be > 0.")
-                continue
-            for _ in range(days):
-                print(game.next_day())
-        else:
-            print("Unknown or malformed command. Type 'help'.")

@@ -16,7 +16,7 @@ from typing import Any
 
 from flask import Flask, jsonify, render_template, request, session
 
-from game_factory.game import FactoryGame
+from game_factory.game import FactoryGame, ITEM_CATALOG, ITEM_IDS, RECIPE_IDS
 
 # Single in-process game instance.  Fine for a single-player desktop MVP;
 # replace with a session-keyed store if multi-user support is needed.
@@ -105,6 +105,9 @@ def _game_state() -> dict[str, Any]:
     return {
         "day": g.day,
         "cash": round(g.cash, 2),
+        "items": list(ITEM_IDS),
+        "recipes": list(RECIPE_IDS),
+        "item_icons": {item_name: str(item["icon"]) for item_name, item in ITEM_CATALOG.items()},
         "total_workers": g.total_workers,
         "assigned_workers": assigned,
         # free_workers is derived here so the client doesn't have to compute it.

@@ -67,7 +67,7 @@ class TestApiState:
     def test_contains_core_fields(self, client):
         payload = client.get("/api/state").get_json()
         required = [
-            "day", "cash", "total_workers", "assigned_workers", "free_workers",
+            "day", "cash", "items", "recipes", "item_icons", "total_workers", "assigned_workers", "free_workers",
             "worker_hire_cost", "worker_fire_fee", "daily_salary",
             "inventory", "market_prices", "price_bounds", "price_history",
             "price_change", "assignments", "owned_blueprints",
@@ -86,8 +86,14 @@ class TestApiState:
 
     def test_inventory_contains_all_items(self, client):
         payload = client.get("/api/state").get_json()
-        for item in ["ore", "wood", "ingot", "gear", "widget", "scrap"]:
+        for item in payload["items"]:
             assert item in payload["inventory"]
+
+    def test_item_icons_are_present_for_each_item(self, client):
+        payload = client.get("/api/state").get_json()
+        for item in payload["items"]:
+            assert item in payload["item_icons"]
+            assert payload["item_icons"][item]
 
     def test_price_history_starts_with_day_1(self, client):
         payload = client.get("/api/state").get_json()
@@ -95,7 +101,7 @@ class TestApiState:
 
     def test_effective_recipes_keys_match_recipes(self, client):
         payload = client.get("/api/state").get_json()
-        for recipe in ["ingot", "gear", "widget", "scrap_mix"]:
+        for recipe in payload["recipes"]:
             assert recipe in payload["effective_recipes"]
 
     def test_effective_recipes_have_inputs_and_outputs(self, client):
@@ -106,7 +112,7 @@ class TestApiState:
 
     def test_margins_contain_all_recipes(self, client):
         payload = client.get("/api/state").get_json()
-        for recipe in ["ingot", "gear", "widget", "scrap_mix"]:
+        for recipe in payload["recipes"]:
             assert recipe in payload["margins"]
             for field in ["input_cost", "output_value", "margin"]:
                 assert field in payload["margins"][recipe]

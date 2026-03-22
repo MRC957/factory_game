@@ -3,12 +3,12 @@
 // All render functions read from G, so they can be re-run cheaply after any action.
 let G = null;
 
-// These constants mirror the server-side model and define rendering order.
-const ALL_ITEMS   = ["ore", "wood", "ingot", "gear", "widget", "scrap"];
-const ALL_RECIPES = ["ingot", "gear", "widget", "scrap_mix"];
+// Catalog fallbacks used before the first /api/state payload arrives.
+const FALLBACK_ITEMS   = ["ore", "wood", "ingot", "gear", "widget", "scrap"];
+const FALLBACK_RECIPES = ["ingot", "gear", "widget", "scrap_mix"];
 
 // Emoji icons for each item / recipe name, shown in market, inventory, etc.
-const ITEM_EMOJI = {
+const FALLBACK_ITEM_EMOJI = {
   ore:      "🪨",
   wood:     "🪵",
   ingot:    "🔩",
@@ -18,9 +18,17 @@ const ITEM_EMOJI = {
   scrap_mix:"🗑️",
 };
 
+function allItems(state = G) {
+  return Array.isArray(state?.items) && state.items.length > 0 ? state.items : FALLBACK_ITEMS;
+}
+
+function allRecipes(state = G) {
+  return Array.isArray(state?.recipes) && state.recipes.length > 0 ? state.recipes : FALLBACK_RECIPES;
+}
+
 /** Returns a <span> element string with the emoji for a given item/recipe name. */
 function itemIcon(name) {
-  const emoji = ITEM_EMOJI[name];
+  const emoji = G?.item_icons?.[name] ?? FALLBACK_ITEM_EMOJI[name];
   return emoji ? `<span class="item-icon" aria-hidden="true">${emoji}</span>` : "";
 }
 let priceHistoryVisible = false;
@@ -223,7 +231,7 @@ function toggleInventorySidebar() {
 }
 
 function setSelectedMarketItem(item) {
-  if (!ALL_ITEMS.includes(item)) return;
+  if (!allItems().includes(item)) return;
   selectedMarketItem = item;
   const out = document.getElementById("selected-market-item");
   if (out) out.textContent = item;
@@ -317,7 +325,7 @@ function renderStatusBar(s) {
 function renderMarket(s) {
   const tbody = document.getElementById("market-tbody");
   tbody.innerHTML = "";
-  ALL_ITEMS.forEach(item => {
+  allItems(s).forEach(item => {
     const price  = s.market_prices[item] ?? 0;
     // price_change is already converted to % by the server (fraction × 100).
     const change = s.price_change[item]  ?? 0;
@@ -337,7 +345,7 @@ function renderInventory(s, targetId = "inventory-sidebar-grid") {
   const grid = document.getElementById(targetId);
   if (!grid) return;
   grid.innerHTML = "";
-  ALL_ITEMS.forEach(item => {
+  allItems(s).forEach(item => {
     const qty = s.inventory[item] ?? 0;
     const div = document.createElement("div");
     div.className = "inv-item";
@@ -453,7 +461,7 @@ function renderPriceChart(s) {
 function renderFactory(s) {
   const list = document.getElementById("assign-list");
   list.innerHTML = "";
-  ALL_RECIPES.forEach(recipe => {
+  allRecipes(s).forEach(recipe => {
     const current = s.assignments[recipe] ?? 0;
     const row = document.createElement("div");
     row.className = "assign-row";
@@ -492,7 +500,7 @@ function renderBlueprints(s) {
 function renderMargins(s) {
   const tbody = document.getElementById("margins-tbody");
   tbody.innerHTML = "";
-  ALL_RECIPES.forEach(recipe => {
+  allRecipes(s).forEach(recipe => {
     // s.margins uses effective recipes (post-blueprint), matching what the player
     // actually experiences — not the bare base recipe values.
     const m  = s.margins[recipe];
