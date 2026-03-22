@@ -181,6 +181,16 @@
   .profit { color: var(--green); font-weight: 700; }
   .loss   { color: var(--red);   font-weight: 700; }
   .risky  { color: var(--gold);  font-weight: 700; }
+  /* ── Item icons ────────────────────────────────────────────────────── */
+  .item-icon {
+    font-size: 1em;
+    margin-right: 5px;
+    vertical-align: middle;
+    line-height: 1;
+    display: inline-block;
+  }
+  .item-name { vertical-align: middle; }
+
   .owned-badge {
     display: inline-block;
     background: var(--green);
@@ -290,6 +300,16 @@
   #next-day-wrap { display: flex; align-items: center; flex-direction: column; gap: 6px; }
   #days-input { width: 80px; text-align: center; }
   .days-label { font-size: 0.72rem; color: var(--muted); text-align: center; }
+  .save-row { display: flex; gap: 6px; align-items: center; }
+  #save-slot {
+    width: 100px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text);
+    padding: 6px 8px;
+    font-size: 0.82rem;
+  }
 </style>
 </head>
 <body>

@@ -6,6 +6,23 @@ let G = null;
 // These constants mirror the server-side model and define rendering order.
 const ALL_ITEMS   = ["ore", "wood", "ingot", "gear", "widget", "scrap"];
 const ALL_RECIPES = ["ingot", "gear", "widget", "scrap_mix"];
+
+// Emoji icons for each item / recipe name, shown in market, inventory, etc.
+const ITEM_EMOJI = {
+  ore:      "🪨",
+  wood:     "🪵",
+  ingot:    "🔩",
+  gear:     "⚙️",
+  widget:   "📦",
+  scrap:    "🗑️",
+  scrap_mix:"🗑️",
+};
+
+/** Returns a <span> element string with the emoji for a given item/recipe name. */
+function itemIcon(name) {
+  const emoji = ITEM_EMOJI[name];
+  return emoji ? `<span class="item-icon" aria-hidden="true">${emoji}</span>` : "";
+}
 let priceHistoryVisible = false;
 let selectedMarketItem = "ore";
 let inventorySidebarMinimized = localStorage.getItem("inventory_sidebar_minimized") === "1";
@@ -56,6 +73,9 @@ const I18N = {
     automationNote: "Workers produce 1 batch per assigned worker per day automatically.",
     daysToAdvance: "Days to advance",
     nextDay: "⏭ Next Day",
+    save: "Save",
+    load: "Load",
+    saveSlot: "Slot",
     recipeHint: "Select a recipe to see its inputs and outputs.",
     inputs: "Inputs",
     outputs: "Outputs",
@@ -111,6 +131,9 @@ const I18N = {
     automationNote: "Chaque ouvrier affecté produit 1 lot par jour automatiquement.",
     daysToAdvance: "Jours à avancer",
     nextDay: "⏭ Jour suivant",
+    save: "Sauvegarder",
+    load: "Charger",
+    saveSlot: "Slot",
     recipeHint: "Sélectionnez une recette pour voir ses entrées et sorties.",
     inputs: "Entrées",
     outputs: "Sorties",
@@ -176,6 +199,9 @@ function applyTranslations() {
   document.getElementById("automation-note").textContent = t("automationNote");
   document.getElementById("days-label").textContent = t("daysToAdvance");
   document.getElementById("btn-next-day").textContent = t("nextDay");
+  document.getElementById("btn-save-game").textContent = t("save");
+  document.getElementById("btn-load-game").textContent = t("load");
+  document.getElementById("save-slot").placeholder = t("saveSlot");
   if (!G) {
     document.getElementById("recipe-info").innerHTML = t("recipeHint");
   }
@@ -301,7 +327,7 @@ function renderMarket(s) {
     tr.className = item === selectedMarketItem ? "market-row-selected" : "";
     tr.onclick = () => setSelectedMarketItem(item);
     tr.style.cursor = "pointer";
-    tr.innerHTML = `<td>${item}</td><td>${fmt(price)}</td>
+    tr.innerHTML = `<td>${itemIcon(item)}<span class="item-name">${item}</span></td><td>${fmt(price)}</td>
       <td class="${cls}">${arrow} ${change > 0 ? "+" : ""}${change.toFixed(1)}%</td>`;
     tbody.appendChild(tr);
   });
@@ -315,7 +341,7 @@ function renderInventory(s, targetId = "inventory-sidebar-grid") {
     const qty = s.inventory[item] ?? 0;
     const div = document.createElement("div");
     div.className = "inv-item";
-    div.innerHTML = `<div class="inv-name">${item}</div>
+    div.innerHTML = `<div class="inv-name">${itemIcon(item)}<span class="item-name">${item}</span></div>
       <div class="inv-qty" style="color:${qty > 0 ? "var(--text)" : "var(--muted)"}">${qty}</div>`;
     grid.appendChild(div);
   });
@@ -434,7 +460,7 @@ function renderFactory(s) {
     // max is set to total_workers so the browser's native number validation
     // prevents obviously-invalid inputs before the request even leaves the client.
     row.innerHTML = `
-      <span class="assign-recipe">${recipe}</span>
+      <span class="assign-recipe">${itemIcon(recipe)}<span class="item-name">${recipe}</span></span>
       <input type="number" id="assign-${recipe}" value="${current}" min="0" max="${s.total_workers}" style="width:70px">
       <button class="btn-primary" onclick="doAssign('${recipe}')" style="padding:6px 12px;">Set</button>
       <span class="assign-workers">${current > 0 ? `${current} ${t("active")}` : t("idle")}</span>`;
@@ -480,7 +506,7 @@ function renderMargins(s) {
     const verdict = margin > 0 ? "Profitable" : margin < 0 ? "Unprofitable" : "Break-even";
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td style="font-weight:700">${recipe}</td>
+      <td style="font-weight:700">${itemIcon(recipe)}<span class="item-name">${recipe}</span></td>
       <td style="color:var(--muted); font-size:0.85rem">${inputs}</td>
       <td>${fmt(m.input_cost)}</td>
       <td style="color:var(--muted); font-size:0.85rem">${outputs}</td>
@@ -646,6 +672,20 @@ async function doAssign(recipe) {
 async function doBuyBlueprint(name) {
   const r = await api("/api/buy_blueprint", { name });
   log(r.message, r.message.startsWith("Bought") ? "log-ok" : "log-err");
+  render(r.state);
+}
+
+async function doSave() {
+  const slot = document.getElementById("save-slot").value || "default";
+  const r = await api("/api/save", { slot });
+  log(r.message, r.message.startsWith("Game saved") ? "log-ok" : "log-err");
+  render(r.state);
+}
+
+async function doLoad() {
+  const slot = document.getElementById("save-slot").value || "default";
+  const r = await api("/api/load", { slot });
+  log(r.message, r.message.startsWith("Game loaded") ? "log-ok" : "log-err");
   render(r.state);
 }
 

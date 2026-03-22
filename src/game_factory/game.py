@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import ast
 from dataclasses import dataclass
 from math import floor
 import random
-from typing import Dict
+from typing import Any, Dict
 
 
 @dataclass(frozen=True)
@@ -80,6 +81,68 @@ class FactoryGame:
         }
         self.owned_blueprints: set[str] = set()
         self._record_price_history()
+
+    def to_save_dict(self) -> dict[str, Any]:
+        return {
+            "version": 1,
+            "day": self.day,
+            "cash": self.cash,
+            "total_workers": self.total_workers,
+            "assignments": dict(self.assignments),
+            "inventory": dict(self.inventory),
+            "market_prices": dict(self.market_prices),
+            "price_change": dict(self.price_change),
+            "price_history": list(self.price_history),
+            "owned_blueprints": sorted(self.owned_blueprints),
+            "rng_state": repr(self.rng.getstate()),
+        }
+
+    @classmethod
+    def from_save_dict(cls, payload: dict[str, Any]) -> FactoryGame:
+        g = cls()
+        g.day = int(payload.get("day", g.day))
+        g.cash = float(payload.get("cash", g.cash))
+        g.total_workers = int(payload.get("total_workers", g.total_workers))
+
+        saved_assignments = payload.get("assignments", {})
+        if isinstance(saved_assignments, dict):
+            for key in g.assignments:
+                g.assignments[key] = int(saved_assignments.get(key, g.assignments[key]))
+
+        saved_inventory = payload.get("inventory", {})
+        if isinstance(saved_inventory, dict):
+            for key in g.inventory:
+                g.inventory[key] = int(saved_inventory.get(key, g.inventory[key]))
+
+        saved_prices = payload.get("market_prices", {})
+        if isinstance(saved_prices, dict):
+            for key in g.market_prices:
+                g.market_prices[key] = float(saved_prices.get(key, g.market_prices[key]))
+
+        saved_change = payload.get("price_change", {})
+        if isinstance(saved_change, dict):
+            for key in g.price_change:
+                g.price_change[key] = float(saved_change.get(key, g.price_change[key]))
+
+        saved_history = payload.get("price_history", [])
+        if isinstance(saved_history, list) and saved_history:
+            g.price_history = saved_history
+        else:
+            g.price_history = []
+            g._record_price_history()
+
+        saved_blueprints = payload.get("owned_blueprints", [])
+        if isinstance(saved_blueprints, list):
+            g.owned_blueprints = {bp for bp in saved_blueprints if bp in g.blueprints}
+
+        rng_state = payload.get("rng_state")
+        if isinstance(rng_state, str):
+            try:
+                g.rng.setstate(ast.literal_eval(rng_state))
+            except Exception:
+                pass
+
+        return g
 
     def _record_price_history(self) -> None:
         snapshot: dict[str, float | int] = {"day": self.day}

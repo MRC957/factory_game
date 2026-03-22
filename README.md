@@ -47,3 +47,9 @@ PYTHONPATH=src python main.py
 - Not-always-profitable recipes.
 - Slightly dynamic daily prices.
 - Financial, market, and margin dashboards.
+
+## Save system and sessions
+
+- Use the bottom bar `Save` / `Load` buttons to persist or restore a run.
+- Saves are stored as JSON files in `saves/` (slot-based, default slot: `default`).
+- Browser sessions are isolated: opening the game in two different browsers/incognito windows creates two independent player states running simultaneously.

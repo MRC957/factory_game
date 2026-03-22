@@ -370,3 +370,32 @@ class TestApiNextDay:
         resp = client.post("/api/next_day", json={"days": 1})
         state = resp.get_json()["state"]
         assert state["bankrupt"] is True
+
+
+# ── /api/save + /api/load ───────────────────────────────────────────────────
+
+class TestApiSaveLoad:
+    def test_save_then_load_restores_state(self, client, tmp_path):
+        web_gui.SAVE_DIR = tmp_path
+        web_gui._game.cash = 321.0
+        client.post("/api/buy", json={"item": "ore", "qty": 2})
+
+        save_resp = client.post("/api/save", json={"slot": "alpha"})
+        assert save_resp.status_code == 200
+        assert "Game saved" in save_resp.get_json()["message"]
+
+        client.post("/api/buy", json={"item": "wood", "qty": 1})
+        load_resp = client.post("/api/load", json={"slot": "alpha"})
+        payload = load_resp.get_json()
+
+        assert load_resp.status_code == 200
+        assert "Game loaded" in payload["message"]
+        assert payload["state"]["inventory"]["ore"] == 2
+        assert payload["state"]["inventory"]["wood"] == 0
+
+    def test_load_missing_slot_returns_message(self, client, tmp_path):
+        web_gui.SAVE_DIR = tmp_path
+        resp = client.post("/api/load", json={"slot": "missing_slot"})
+        payload = resp.get_json()
+        assert resp.status_code == 200
+        assert "No save found" in payload["message"]

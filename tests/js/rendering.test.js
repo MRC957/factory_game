@@ -73,6 +73,8 @@ describe('renderStatusBar()', () => {
 // ── renderMarket ──────────────────────────────────────────────────────────────
 
 describe('renderMarket()', () => {
+  const marketName = (tr) => tr.cells[0].querySelector('.item-name')?.textContent ?? tr.cells[0].textContent
+
   it('creates one row per item in ALL_ITEMS (6 items)', () => {
     window.renderMarket(MOCK_STATE)
     const rows = document.querySelectorAll('#market-tbody tr')
@@ -82,7 +84,7 @@ describe('renderMarket()', () => {
   it('each row displays the item name', () => {
     window.renderMarket(MOCK_STATE)
     const rows = Array.from(document.querySelectorAll('#market-tbody tr'))
-    const names = rows.map(tr => tr.cells[0].textContent)
+    const names = rows.map(marketName)
     expect(names).toContain('ore')
     expect(names).toContain('widget')
   })
@@ -98,7 +100,7 @@ describe('renderMarket()', () => {
     window.setSelectedMarketItem('ingot')
     window.renderMarket(MOCK_STATE)
     const rows = Array.from(document.querySelectorAll('#market-tbody tr'))
-    const ingotRow = rows.find(tr => tr.cells[0].textContent === 'ingot')
+    const ingotRow = rows.find(tr => marketName(tr) === 'ingot')
     expect(ingotRow?.className).toContain('market-row-selected')
   })
 
@@ -122,7 +124,7 @@ describe('renderMarket()', () => {
     window.setSelectedMarketItem('ore')
     window.renderMarket(state)
     const rows = Array.from(document.querySelectorAll('#market-tbody tr'))
-    const oreRow = rows.find(tr => tr.cells[0].textContent === 'ore')
+    const oreRow = rows.find(tr => marketName(tr) === 'ore')
     expect(oreRow?.cells[2].textContent).toContain('↑')
   })
 
@@ -131,7 +133,7 @@ describe('renderMarket()', () => {
     window.setSelectedMarketItem('ore')
     window.renderMarket(state)
     const rows = Array.from(document.querySelectorAll('#market-tbody tr'))
-    const oreRow = rows.find(tr => tr.cells[0].textContent === 'ore')
+    const oreRow = rows.find(tr => marketName(tr) === 'ore')
     expect(oreRow?.cells[2].textContent).toContain('↓')
   })
 })
@@ -145,11 +147,13 @@ describe('renderInventory()', () => {
     expect(cards.length).toBe(6)
   })
 
+  const inventoryName = (el) => el.querySelector('.item-name')?.textContent ?? el.textContent
+
   it('each card shows the item name', () => {
     window.renderInventory(MOCK_STATE, 'inventory-sidebar-grid')
     const names = Array.from(
       document.querySelectorAll('#inventory-sidebar-grid .inv-name')
-    ).map(el => el.textContent)
+    ).map(inventoryName)
     expect(names).toContain('ore')
     expect(names).toContain('scrap')
   })
@@ -158,7 +162,7 @@ describe('renderInventory()', () => {
     const state = cloneState({ inventory: { ...MOCK_STATE.inventory, ore: 42 } })
     window.renderInventory(state, 'inventory-sidebar-grid')
     const cards = Array.from(document.querySelectorAll('#inventory-sidebar-grid .inv-item'))
-    const oreCard = cards.find(c => c.querySelector('.inv-name').textContent === 'ore')
+    const oreCard = cards.find(c => inventoryName(c.querySelector('.inv-name')) === 'ore')
     expect(oreCard?.querySelector('.inv-qty').textContent).toBe('42')
   })
 
@@ -271,10 +275,12 @@ describe('renderMargins()', () => {
     expect(rows.length).toBe(4)
   })
 
+  const marginRecipeName = (tr) => tr.cells[0].querySelector('.item-name')?.textContent ?? tr.cells[0].textContent
+
   it('shows recipe name in each row', () => {
     window.renderMargins(MOCK_STATE)
-    const names = Array.from(document.querySelectorAll('#margins-tbody tr td:first-child'))
-      .map(td => td.textContent)
+    const rows = Array.from(document.querySelectorAll('#margins-tbody tr'))
+    const names = rows.map(marginRecipeName)
     expect(names).toContain('ingot')
     expect(names).toContain('widget')
   })
@@ -283,7 +289,7 @@ describe('renderMargins()', () => {
     window.renderMargins(MOCK_STATE)
     // ingot has margin 11.0 → profitable
     const rows = document.querySelectorAll('#margins-tbody tr')
-    const ingotRow = Array.from(rows).find(tr => tr.cells[0].textContent === 'ingot')
+    const ingotRow = Array.from(rows).find(tr => marginRecipeName(tr) === 'ingot')
     const marginCell = ingotRow?.cells[5]
     expect(marginCell?.className).toBe('profit')
   })
@@ -292,7 +298,7 @@ describe('renderMargins()', () => {
     window.renderMargins(MOCK_STATE)
     // scrap_mix has margin -17.0 → unprofitable
     const rows = document.querySelectorAll('#margins-tbody tr')
-    const scrapRow = Array.from(rows).find(tr => tr.cells[0].textContent === 'scrap_mix')
+    const scrapRow = Array.from(rows).find(tr => marginRecipeName(tr) === 'scrap_mix')
     const marginCell = scrapRow?.cells[5]
     expect(marginCell?.className).toBe('loss')
   })
@@ -300,7 +306,7 @@ describe('renderMargins()', () => {
   it('shows formatted input cost, output value, and margin', () => {
     window.renderMargins(MOCK_STATE)
     const rows = Array.from(document.querySelectorAll('#margins-tbody tr'))
-    const ingotRow = rows.find(tr => tr.cells[0].textContent === 'ingot')
+    const ingotRow = rows.find(tr => marginRecipeName(tr) === 'ingot')
     // input_cost = 24, output_value = 35, margin = 11
     expect(ingotRow?.cells[2].textContent).toBe('$24.00')
     expect(ingotRow?.cells[4].textContent).toBe('$35.00')

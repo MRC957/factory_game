@@ -335,6 +335,54 @@ describe('doBuyBlueprint()', () => {
   })
 })
 
+// ── doSave / doLoad ──────────────────────────────────────────────────────────
+
+describe('doSave()', () => {
+  it('POSTs to /api/save with the selected slot', async () => {
+    fetchMock.mockResolvedValueOnce({
+      json: async () => apiResponse("Game saved to slot 'alpha'."),
+    })
+    document.getElementById('save-slot').value = 'alpha'
+    await window.doSave()
+    const [url, opts] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/save')
+    expect(JSON.parse(opts.body)).toMatchObject({ slot: 'alpha' })
+  })
+
+  it('falls back to default slot when input is empty', async () => {
+    fetchMock.mockResolvedValueOnce({
+      json: async () => apiResponse("Game saved to slot 'default'."),
+    })
+    document.getElementById('save-slot').value = ''
+    await window.doSave()
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body.slot).toBe('default')
+  })
+})
+
+describe('doLoad()', () => {
+  it('POSTs to /api/load with the selected slot', async () => {
+    fetchMock.mockResolvedValueOnce({
+      json: async () => apiResponse("Game loaded from slot 'alpha'.", { day: 3 }),
+    })
+    document.getElementById('save-slot').value = 'alpha'
+    await window.doLoad()
+    const [url, opts] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/load')
+    expect(JSON.parse(opts.body)).toMatchObject({ slot: 'alpha' })
+    expect(document.getElementById('stat-day').textContent).toBe('3')
+  })
+
+  it('logs error style when save slot does not exist', async () => {
+    fetchMock.mockResolvedValueOnce({
+      json: async () => apiResponse("No save found for slot 'missing'."),
+    })
+    document.getElementById('save-slot').value = 'missing'
+    await window.doLoad()
+    expect(document.querySelectorAll('#log-box .log-err').length).toBeGreaterThan(0)
+  })
+})
+
 // ── doNextDay ─────────────────────────────────────────────────────────────────
 
 describe('doNextDay()', () => {

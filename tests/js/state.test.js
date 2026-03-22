@@ -48,7 +48,9 @@ describe('setSelectedMarketItem()', () => {
     window.setSelectedMarketItem('ore')
     window.setSelectedMarketItem('widget')
     const rows = document.querySelectorAll('#market-tbody tr')
-    const oreRow = Array.from(rows).find(tr => tr.cells[0]?.textContent === 'ore')
+    const oreRow = Array.from(rows).find(tr =>
+      (tr.cells[0]?.querySelector('.item-name')?.textContent ?? tr.cells[0]?.textContent) === 'ore'
+    )
     expect(oreRow?.className).not.toContain('market-row-selected')
   })
 

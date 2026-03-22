@@ -4,5 +4,10 @@
     <div class="days-label" id="days-label">Days to advance</div>
     <input type="number" id="days-input" value="1" min="1" max="30">
     <button class="btn-nextday" id="btn-next-day" onclick="doNextDay()">⏭ Next Day</button>
+    <div class="save-row">
+      <input type="text" id="save-slot" value="default" maxlength="24" aria-label="Save slot">
+      <button class="btn-primary" id="btn-save-game" onclick="doSave()">Save</button>
+      <button class="btn-primary" id="btn-load-game" onclick="doLoad()">Load</button>
+    </div>
   </div>
 </div>

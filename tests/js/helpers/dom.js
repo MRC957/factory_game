@@ -118,6 +118,9 @@ export function createDOM() {
     <label id="days-label"></label>
     <input id="days-input" type="number" value="1" />
     <button id="btn-next-day"></button>
+    <input id="save-slot" type="text" value="default" />
+    <button id="btn-save-game"></button>
+    <button id="btn-load-game"></button>
 
     <!-- Language selector -->
     <select id="lang-select">
