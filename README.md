@@ -49,3 +49,14 @@ Then open `http://localhost:5000`.
 - Use the bottom bar `Save` / `Load` buttons to persist or restore a run.
 - Saves are stored as JSON files in `saves/` (slot-based, default slot: `default`).
 - Browser sessions are isolated: opening the game in two different browsers/incognito windows creates two independent player states running simultaneously.
+
+## Roadmap (summary)
+
+1. Expand save/load robustness and deterministic seeded runs.
+2. Add contracts and richer market events with clearer risk/reward.
+3. Improve operations depth: warehouse limits and logistics throughput.
+4. Add smarter automation rules and worker specialization.
+5. Expand machine lifecycle systems and machine-level upgrades.
+6. Introduce a research tree (efficiency, throughput, reliability, market intelligence).
+7. Add broader financial pressure (energy/utilities, rent/tax style costs).
+8. Introduce competitor pressure and market-share dynamics.
