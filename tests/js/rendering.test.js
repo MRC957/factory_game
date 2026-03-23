@@ -181,13 +181,13 @@ describe('renderFactory()', () => {
     expect(rows.length).toBe(4)
   })
 
-  it('each row contains a number input for assignment', () => {
+  it('each row contains a quantity input for assignment', () => {
     window.renderFactory(MOCK_STATE)
     // There should be 4 inputs: assign-ingot, assign-gear, assign-widget, assign-scrap_mix
     for (const recipe of ['ingot', 'gear', 'widget', 'scrap_mix']) {
       const input = document.getElementById(`assign-${recipe}`)
       expect(input).not.toBeNull()
-      expect(input.type).toBe('number')
+      expect(input.type).toBe('text')
     }
   })
 

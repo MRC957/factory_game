@@ -90,7 +90,11 @@ export function createDOM() {
       <option value="scrap_mix">scrap_mix</option>
     </select>
     <label id="lbl-craft-qty"></label>
-    <input id="craft-qty" type="number" value="1" />
+    <div class="qty-stepper">
+      <button id="btn-qty-craft-dec"></button>
+      <input id="craft-qty" type="text" value="1" />
+      <button id="btn-qty-craft-inc"></button>
+    </div>
     <button id="btn-max-craft"></button>
     <button id="btn-craft"></button>
     <div id="recipe-info"></div>
@@ -98,11 +102,19 @@ export function createDOM() {
     <!-- Workers -->
     <span  id="workers-title"></span>
     <label id="lbl-hire-qty"></label>
-    <input id="hire-qty" type="number" value="1" />
+    <div class="qty-stepper">
+      <button id="btn-qty-hire-dec"></button>
+      <input id="hire-qty" type="text" value="1" />
+      <button id="btn-qty-hire-inc"></button>
+    </div>
     <button id="btn-max-hire"></button>
     <button id="btn-hire"></button>
     <label id="lbl-fire-qty"></label>
-    <input id="fire-qty" type="number" value="1" />
+    <div class="qty-stepper">
+      <button id="btn-qty-fire-dec"></button>
+      <input id="fire-qty" type="text" value="1" />
+      <button id="btn-qty-fire-inc"></button>
+    </div>
     <button id="btn-max-fire"></button>
     <button id="btn-fire"></button>
 

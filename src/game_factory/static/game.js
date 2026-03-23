@@ -254,28 +254,89 @@ function setSelectedMarketItem(item) {
   }
 }
 
+const QtyInput = {
+  parse(rawValue, fallback = 0) {
+    const digitsOnly = String(rawValue ?? "").replace(/\D+/g, "");
+    if (!digitsOnly) return fallback;
+    return Math.max(0, Number.parseInt(digitsOnly, 10));
+  },
+
+  normalize(inputId, fallback = 0) {
+    const input = document.getElementById(inputId);
+    if (!input) return null;
+    const normalized = QtyInput.parse(input.value, fallback);
+    if (input.value !== String(normalized)) {
+      input.value = String(normalized);
+    }
+    return normalized;
+  },
+
+  adjust(inputId, delta, fallback = 0) {
+    const input = document.getElementById(inputId);
+    if (!input) return null;
+    const current = QtyInput.parse(input.value, fallback);
+    const next = Math.max(0, current + delta);
+    input.value = String(next);
+    return next;
+  },
+};
+
 function parseMarketQty(rawValue, fallback = 0) {
-  const digitsOnly = String(rawValue ?? "").replace(/\D+/g, "");
-  if (!digitsOnly) return fallback;
-  return Math.max(0, Number.parseInt(digitsOnly, 10));
+  return QtyInput.parse(rawValue, fallback);
 }
 
 function onMarketQtyInput() {
-  const input = document.getElementById("market-qty");
-  if (!input) return;
-  const normalized = parseMarketQty(input.value, 0);
-  if (input.value !== String(normalized)) {
-    input.value = String(normalized);
-  }
+  QtyInput.normalize("market-qty", 0);
   updateCostPreview();
 }
 
 function adjustMarketQty(delta) {
-  const input = document.getElementById("market-qty");
-  if (!input) return;
-  const current = parseMarketQty(input.value, 0);
-  input.value = String(Math.max(0, current + delta));
+  QtyInput.adjust("market-qty", delta, 0);
   updateCostPreview();
+}
+
+function parseCraftQty(rawValue, fallback = 0) {
+  return QtyInput.parse(rawValue, fallback);
+}
+
+function onCraftQtyInput() {
+  QtyInput.normalize("craft-qty", 0);
+}
+
+function adjustCraftQty(delta) {
+  QtyInput.adjust("craft-qty", delta, 0);
+}
+
+function parseHireQty(rawValue, fallback = 0) {
+  return QtyInput.parse(rawValue, fallback);
+}
+
+function onHireQtyInput() {
+  QtyInput.normalize("hire-qty", 0);
+}
+
+function adjustHireQty(delta) {
+  QtyInput.adjust("hire-qty", delta, 0);
+}
+
+function parseFireQty(rawValue, fallback = 0) {
+  return QtyInput.parse(rawValue, fallback);
+}
+
+function onFireQtyInput() {
+  QtyInput.normalize("fire-qty", 0);
+}
+
+function adjustFireQty(delta) {
+  QtyInput.adjust("fire-qty", delta, 0);
+}
+
+function onAssignmentQtyInput(recipe) {
+  QtyInput.normalize(`assign-${recipe}`, 0);
+}
+
+function adjustAssignmentQty(recipe, delta) {
+  QtyInput.adjust(`assign-${recipe}`, delta, 0);
 }
 
 function setLanguage(lang) {
@@ -535,11 +596,13 @@ function renderFactory(s) {
     const current = s.assignments[recipe] ?? 0;
     const row = document.createElement("div");
     row.className = "assign-row";
-    // max is set to total_workers so the browser's native number validation
-    // prevents obviously-invalid inputs before the request even leaves the client.
     row.innerHTML = `
       <span class="assign-recipe">${itemIcon(recipe)}<span class="item-name">${recipe}</span></span>
-      <input type="number" id="assign-${recipe}" value="${current}" min="0" max="${s.total_workers}" style="width:70px">
+      <div class="qty-stepper">
+        <button class="qty-stepper-btn" type="button" onclick="adjustAssignmentQty('${recipe}', -1)" aria-label="Decrease quantity">−</button>
+        <input type="text" id="assign-${recipe}" value="${current}" inputmode="numeric" oninput="onAssignmentQtyInput('${recipe}')" aria-label="Assignment quantity for ${recipe}">
+        <button class="qty-stepper-btn" type="button" onclick="adjustAssignmentQty('${recipe}', 1)" aria-label="Increase quantity">+</button>
+      </div>
       <button class="btn-primary" onclick="doAssign('${recipe}')" style="padding:6px 12px;">Set</button>
       <span class="assign-workers">${current > 0 ? `${current} ${t("active")}` : t("idle")}</span>`;
     list.appendChild(row);
@@ -667,6 +730,7 @@ function setFireMax() {
   const byHeadcount = G.total_workers ?? 0;
   const maxQty = Math.min(byCash, byHeadcount);
   document.getElementById("fire-qty").value = String(Math.max(0, maxQty));
+  // no cost preview needed for fire — value is just updated in place
 }
 
 function togglePriceHistory() {
@@ -720,7 +784,7 @@ async function doSell() {
 
 async function doCraft() {
   const recipe = document.getElementById("craft-recipe").value;
-  const qty    = parseInt(document.getElementById("craft-qty").value) || 0;
+  const qty    = parseCraftQty(document.getElementById("craft-qty").value, 0);
   if (qty < 1) { log("Enter a valid quantity.", "log-err"); return; }
   const r = await api("/api/craft", { recipe, qty });
   log(r.message, r.message.startsWith("Crafted") ? "log-ok" : "log-err");
@@ -728,7 +792,7 @@ async function doCraft() {
 }
 
 async function doHire() {
-  const qty = parseInt(document.getElementById("hire-qty").value) || 0;
+  const qty = parseHireQty(document.getElementById("hire-qty").value, 0);
   if (qty < 1) { log("Enter a valid quantity.", "log-err"); return; }
   const r = await api("/api/hire", { qty });
   log(r.message, r.message.startsWith("Hired") ? "log-ok" : "log-err");
@@ -736,7 +800,7 @@ async function doHire() {
 }
 
 async function doFire() {
-  const qty = parseInt(document.getElementById("fire-qty").value) || 0;
+  const qty = parseFireQty(document.getElementById("fire-qty").value, 0);
   if (qty < 1) { log("Enter a valid quantity.", "log-err"); return; }
   const r = await api("/api/fire", { qty });
   log(r.message, r.message.startsWith("Fired") ? "log-ok" : "log-err");
@@ -744,7 +808,7 @@ async function doFire() {
 }
 
 async function doAssign(recipe) {
-  const qty = parseInt(document.getElementById("assign-" + recipe).value) || 0;
+  const qty = QtyInput.parse(document.getElementById("assign-" + recipe).value, 0);
   const r = await api("/api/assign", { recipe, qty });
   log(r.message, r.message.startsWith("Assigned") ? "log-ok" : "log-err");
   renderAction(r.state, {

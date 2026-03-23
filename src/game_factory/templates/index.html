@@ -266,16 +266,42 @@
 
   /* ── Worker assignment row ─────────────────────────────────────────── */
   .assign-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: 120px 118px 64px 1fr;
     align-items: center;
     gap: 10px;
     padding: 6px 0;
     border-bottom: 1px solid var(--border);
   }
   .assign-row:last-child { border-bottom: none; }
-  .assign-recipe { min-width: 90px; font-weight: 600; text-transform: capitalize; }
-  .assign-row input[type=number] { width: 70px; }
+  .assign-recipe { min-width: 0; font-weight: 600; text-transform: capitalize; }
+  .assign-row .qty-stepper {
+    width: 118px;
+    max-width: 118px;
+    gap: 6px;
+  }
+  .assign-row .qty-stepper input[type=text] {
+    padding: 6px 8px;
+    font-size: 0.9rem;
+  }
+  .assign-row .qty-stepper-btn {
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    font-size: 1rem;
+  }
   .assign-workers { color: var(--muted); font-size: 0.85rem; min-width: 90px; }
+  @media (max-width: 720px) {
+    .assign-row {
+      grid-template-columns: 1fr;
+      align-items: stretch;
+    }
+    .assign-row .qty-stepper {
+      width: 100%;
+      max-width: 118px;
+    }
+    .assign-workers { min-width: 0; }
+  }
 
   /* ── Cost preview ──────────────────────────────────────────────────── */
   .cost-preview { font-size: 0.88rem; color: var(--muted); margin: 6px 0; }
@@ -475,7 +501,11 @@
         </div>
         <div class="field">
           <label for="craft-qty" id="lbl-craft-qty">Batches</label>
-          <input type="number" id="craft-qty" value="1" min="0" max="9999">
+          <div class="qty-stepper">
+            <button type="button" class="qty-stepper-btn" id="btn-qty-craft-dec" onclick="adjustCraftQty(-1)" aria-label="Decrease quantity">−</button>
+            <input type="text" id="craft-qty" value="1" inputmode="numeric" oninput="onCraftQtyInput()" aria-label="Craft batches">
+            <button type="button" class="qty-stepper-btn" id="btn-qty-craft-inc" onclick="adjustCraftQty(1)" aria-label="Increase quantity">+</button>
+          </div>
         </div>
         <div class="btn-row" style="margin-bottom:8px;">
           <button class="btn-primary" id="btn-max-craft" onclick="setCraftMax()">Max Craft</button>
@@ -489,7 +519,11 @@
         <div class="card-title" id="workers-title">Workers</div>
         <div class="field">
           <label for="hire-qty" id="lbl-hire-qty">Hire quantity ($150 each)</label>
-          <input type="number" id="hire-qty" value="1" min="0" max="100">
+          <div class="qty-stepper">
+            <button type="button" class="qty-stepper-btn" id="btn-qty-hire-dec" onclick="adjustHireQty(-1)" aria-label="Decrease quantity">−</button>
+            <input type="text" id="hire-qty" value="1" inputmode="numeric" oninput="onHireQtyInput()" aria-label="Hire quantity">
+            <button type="button" class="qty-stepper-btn" id="btn-qty-hire-inc" onclick="adjustHireQty(1)" aria-label="Increase quantity">+</button>
+          </div>
         </div>
         <div class="btn-row" style="margin-bottom:8px;">
           <button class="btn-primary" id="btn-max-hire" onclick="setHireMax()">Max Hire</button>
@@ -500,7 +534,11 @@
 
         <div class="field">
           <label for="fire-qty" id="lbl-fire-qty">Fire quantity ($40 fee each)</label>
-          <input type="number" id="fire-qty" value="1" min="0" max="100">
+          <div class="qty-stepper">
+            <button type="button" class="qty-stepper-btn" id="btn-qty-fire-dec" onclick="adjustFireQty(-1)" aria-label="Decrease quantity">−</button>
+            <input type="text" id="fire-qty" value="1" inputmode="numeric" oninput="onFireQtyInput()" aria-label="Fire quantity">
+            <button type="button" class="qty-stepper-btn" id="btn-qty-fire-inc" onclick="adjustFireQty(1)" aria-label="Increase quantity">+</button>
+          </div>
         </div>
         <div class="btn-row" style="margin-bottom:8px;">
           <button class="btn-primary" id="btn-max-fire" onclick="setFireMax()">Max Fire</button>
