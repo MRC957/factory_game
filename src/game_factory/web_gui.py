@@ -131,6 +131,7 @@ def _game_state(compact: bool = False) -> dict[str, Any]:
         # price_change is stored as a fraction in the model; convert to % for display.
         "price_change": {k: round(v * 100, 1) for k, v in g.price_change.items()},
         "assignments": dict(g.assignments),
+        "automation_preview": g.preview_end_of_day_automation(),
         "owned_blueprints": list(g.owned_blueprints),
         # Bankruptcy threshold is -$500 (a small grace buffer below zero).
         "bankrupt": g.cash < -500,

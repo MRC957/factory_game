@@ -85,3 +85,31 @@ def test_advance_time_rolls_over_day_and_resets_hour() -> None:
 
     assert game.day == 2
     assert game.hour == 2
+
+
+def test_preview_end_of_day_automation_uses_effective_recipes() -> None:
+    game = FactoryGame(seed=5)
+    game.cash = 5000.0
+    assert game.buy_blueprint("precision_molds").startswith("Bought blueprint")
+    game.inventory["ingot"] = 4
+    game.inventory["wood"] = 2
+    game.total_workers = 2
+    game.assignments["gear"] = 2
+
+    preview = game.preview_end_of_day_automation()
+
+    assert preview["produced"]["gear"] == 4
+
+
+def test_preview_end_of_day_automation_shows_only_net_outputs() -> None:
+    game = FactoryGame(seed=5)
+    game.inventory["ore"] = 2
+    game.inventory["wood"] = 1
+    game.inventory["ingot"] = 1
+    game.total_workers = 2
+    game.assignments["ingot"] = 1
+    game.assignments["gear"] = 1
+
+    preview = game.preview_end_of_day_automation()
+
+    assert preview["produced"] == {"gear": 1}

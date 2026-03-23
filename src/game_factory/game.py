@@ -196,15 +196,55 @@ class FactoryGame:
     def _is_market_open(self) -> bool:
         return MARKET_OPEN_HOUR <= self.hour < MARKET_CLOSE_HOUR
 
-    def _run_day_rollover(self) -> list[str]:
+    def _automation_tick(self, inventory: dict[str, int]) -> tuple[dict[str, int], dict[str, int], list[str]]:
+        next_inventory = dict(inventory)
+        produced: dict[str, int] = {}
         lines: list[str] = []
+
         for recipe_name, workers in self.assignments.items():
             if workers <= 0:
                 continue
+
             recipe = self.recipe_effective(recipe_name)
-            crafted = self._apply_recipe(recipe, workers)
+            craftable = workers
+            for item, qty in recipe.inputs.items():
+                if qty <= 0:
+                    continue
+                available = next_inventory.get(item, 0)
+                craftable = min(craftable, floor(available / qty))
+
+            if craftable > 0:
+                for item, qty in recipe.inputs.items():
+                    if qty <= 0:
+                        continue
+                    next_inventory[item] = next_inventory.get(item, 0) - qty * craftable
+
+                for item, qty in recipe.outputs.items():
+                    amount = qty * craftable
+                    if amount <= 0:
+                        continue
+                    next_inventory[item] = next_inventory.get(item, 0) + amount
+                    produced[item] = produced.get(item, 0) + amount
+
             lines.append(
-                f"Automation {recipe_name}: {crafted}/{workers} batch(es)")
+                f"Automation {recipe_name}: {craftable}/{workers} batch(es)")
+
+        return next_inventory, produced, lines
+
+    def preview_end_of_day_automation(self) -> dict[str, dict[str, int]]:
+        next_inventory, _, _ = self._automation_tick(self.inventory)
+        produced = {
+            item: next_inventory.get(item, 0) - self.inventory.get(item, 0)
+            for item in self.inventory
+        }
+        return {
+            "produced": {item: qty for item, qty in produced.items() if qty > 0},
+        }
+
+    def _run_day_rollover(self) -> list[str]:
+        lines: list[str] = []
+        self.inventory, _, automation_lines = self._automation_tick(self.inventory)
+        lines.extend(automation_lines)
 
         salaries = self.total_workers * self.worker_salary
         self.cash -= salaries

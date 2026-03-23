@@ -83,6 +83,8 @@ const I18N = {
     fireWorkers: "Fire Workers",
     automationAssignment: "Automation Assignment",
     automationNote: "Workers produce 1 batch per assigned worker per day automatically.",
+    automationPreviewTitle: "End-of-day automation preview",
+    automationPreviewNone: "No automated output expected with current assignments and inputs.",
     hoursToAdvance: "Hours to advance",
     advanceTime: "⏭ Advance Time",
     restOfDay: "Rest of day",
@@ -146,6 +148,8 @@ const I18N = {
     fireWorkers: "Licencier",
     automationAssignment: "Affectation automatique",
     automationNote: "Chaque ouvrier affecté produit 1 lot par jour automatiquement.",
+    automationPreviewTitle: "Aperçu de production automatique en fin de journée",
+    automationPreviewNone: "Aucune production automatique attendue avec les affectations et stocks actuels.",
     hoursToAdvance: "Heures à avancer",
     advanceTime: "⏭ Avancer le temps",
     restOfDay: "Fin de journée",
@@ -607,6 +611,23 @@ function renderFactory(s) {
       <span class="assign-workers">${current > 0 ? `${current} ${t("active")}` : t("idle")}</span>`;
     list.appendChild(row);
   });
+
+  const previewEl = document.getElementById("automation-preview");
+  if (!previewEl) return;
+
+  const produced = s.automation_preview?.produced || {};
+
+  const orderedProducedItems = allItems(s).filter(item => (produced[item] ?? 0) > 0);
+  const producedText = orderedProducedItems
+    .map(item => `${produced[item]}× ${itemIcon(item)}<span class="item-name">${item}</span>`)
+    .join(", ");
+
+  if (!producedText) {
+    previewEl.innerHTML = `<strong>${t("automationPreviewTitle")}:</strong> ${t("automationPreviewNone")}`;
+    return;
+  }
+
+  previewEl.innerHTML = `<strong>${t("automationPreviewTitle")}:</strong> ${producedText}`;
 }
 
 function renderBlueprints(s) {

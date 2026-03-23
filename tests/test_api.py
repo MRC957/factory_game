@@ -71,7 +71,7 @@ class TestApiState:
             "cash", "items", "recipes", "item_icons", "total_workers", "assigned_workers", "free_workers",
             "worker_hire_cost", "worker_fire_fee", "daily_salary",
             "inventory", "market_prices", "price_bounds", "price_history",
-            "price_change", "assignments", "owned_blueprints",
+            "price_change", "assignments", "automation_preview", "owned_blueprints",
             "blueprints", "effective_recipes", "margins", "bankrupt",
         ]
         for field in required:
