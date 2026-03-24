@@ -475,4 +475,25 @@ describe('updateRecipeInfo()', () => {
     expect(info).toContain('Inputs')
     expect(info).toContain('Outputs')
   })
+
+  it('highlights missing inputs in red (loss class)', () => {
+    const state = cloneState(MOCK_STATE)
+    state.inventory.ore = 0
+    window.render(state)
+    document.getElementById('craft-recipe').value = 'ingot'
+    window.updateRecipeInfo()
+    const info = document.getElementById('recipe-info').innerHTML
+    expect(info).toContain('class="loss"')
+    expect(info).toContain('ore')
+  })
+
+  it('highlights missing machine status in red (loss class)', () => {
+    window.render(MOCK_STATE)
+    document.getElementById('craft-recipe').value = 'gear'
+    window.updateRecipeInfo()
+    const info = document.getElementById('recipe-info').innerHTML
+    expect(info).toContain('Required machine')
+    expect(info).toContain('class="loss"')
+    expect(info).toContain('Missing')
+  })
 })

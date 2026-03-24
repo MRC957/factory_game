@@ -406,13 +406,18 @@ function updateRecipeInfo() {
   if (!er) return;
   const machine = G.machines?.[recipe];
   const inputs = Object.entries(er.inputs)
-    .map(([k, v]) => `${v}× ${itemIcon(k)}<span class="item-name">${k}</span>`)
+    .map(([k, v]) => {
+      const available = G.inventory?.[k] ?? 0;
+      const missing = available < v;
+      return `<span class="${missing ? "loss" : ""}">${v}× ${itemIcon(k)}<span class="item-name">${k}</span></span>`;
+    })
     .join(", ");
   const outputs = Object.entries(er.outputs)
     .map(([k, v]) => `${v}× ${itemIcon(k)}<span class="item-name">${k}</span>`)
     .join(", ");
+  const machineMissing = Boolean(machine && !machine.owned);
   const machineText = machine
-    ? `<br><strong>${t("machineRequired")}:</strong> ${machine.name} (${machineStatusLabel(machine.owned ? machine.status : "missing")})`
+    ? `<br><strong>${t("machineRequired")}:</strong> <span class="${machineMissing ? "loss" : ""}">${machine.name} (${machineStatusLabel(machine.owned ? machine.status : "missing")})</span>`
     : "";
   document.getElementById("recipe-info").innerHTML =
     `<strong>${t("inputs")}:</strong> ${inputs}<br><strong>${t("outputs")}:</strong> ${outputs}${machineText}`;
