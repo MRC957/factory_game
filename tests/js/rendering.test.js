@@ -136,6 +136,28 @@ describe('renderMarket()', () => {
     const oreRow = rows.find(tr => marketName(tr) === 'ore')
     expect(oreRow?.cells[2].textContent).toContain('↓')
   })
+
+  it('disables buy/sell controls and reduces opacity when market is closed', () => {
+    const closedState = { ...MOCK_STATE, market_is_open: false }
+    window.renderMarket(closedState)
+    const buyBtn = document.getElementById('btn-buy')
+    const sellBtn = document.getElementById('btn-sell')
+    const marketQtyInput = document.getElementById('market-qty')
+    expect(buyBtn?.disabled).toBe(true)
+    expect(sellBtn?.disabled).toBe(true)
+    expect(marketQtyInput?.disabled).toBe(true)
+  })
+
+  it('enables buy/sell controls when market is open', () => {
+    const openState = { ...MOCK_STATE, market_is_open: true }
+    window.renderMarket(openState)
+    const buyBtn = document.getElementById('btn-buy')
+    const sellBtn = document.getElementById('btn-sell')
+    const marketQtyInput = document.getElementById('market-qty')
+    expect(buyBtn?.disabled).toBe(false)
+    expect(sellBtn?.disabled).toBe(false)
+    expect(marketQtyInput?.disabled).toBe(false)
+  })
 })
 
 // ── renderInventory ───────────────────────────────────────────────────────────
@@ -211,6 +233,88 @@ describe('renderFactory()', () => {
     const rows = document.querySelectorAll('#assign-list .assign-row')
     const gearRow = Array.from(rows).find(r => r.textContent.includes('gear'))
     expect(gearRow?.textContent).toContain('idle')
+  })
+
+  it('renders one machine card per recipe', () => {
+    window.renderFactory(MOCK_STATE)
+    const cards = document.querySelectorAll('#machine-list .machine-card')
+    expect(cards.length).toBe(4)
+  })
+
+  it('shows buy button for a missing machine', () => {
+    window.renderFactory(MOCK_STATE)
+    const cards = Array.from(document.querySelectorAll('#machine-list .machine-card'))
+    const gearCard = cards.find(card => card.textContent.includes('Gear Press'))
+    expect(gearCard?.textContent).toContain('Buy machine')
+  })
+
+  it('shows maintenance due state for owned worn machine', () => {
+    window.renderFactory(MOCK_STATE)
+    const cards = Array.from(document.querySelectorAll('#machine-list .machine-card'))
+    const recyclerCard = cards.find(card => card.textContent.includes('Recycler'))
+    expect(recyclerCard?.textContent).toContain('Maintenance due')
+  })
+
+  it('hides interval selector when machine strategy is corrective', () => {
+    window.renderFactory(MOCK_STATE)
+    expect(document.getElementById('machine-interval-ingot')).toBeNull()
+  })
+
+  it('shows interval selector when machine strategy is preventive', () => {
+    window.renderFactory(MOCK_STATE)
+    expect(document.getElementById('machine-interval-scrap_mix')).not.toBeNull()
+  })
+
+  it('displays days since last service for owned machines', () => {
+    window.renderFactory(MOCK_STATE)
+    const cards = Array.from(document.querySelectorAll('#machine-list .machine-card'))
+    const smelterCard = cards.find(card => card.textContent.includes('Smelter'))
+    expect(smelterCard?.textContent).toContain('Days since service: 3d')
+  })
+
+  it('disables service button when days since service is 0', () => {
+    const stateWithFreshService = cloneState(MOCK_STATE)
+    stateWithFreshService.machines.ingot.days_since_service = 0
+    window.renderFactory(stateWithFreshService)
+    // After fresh service, the button should be disabled
+    const smelterCard = Array.from(document.querySelectorAll('#machine-list .machine-card'))
+      .find(card => card.textContent.includes('Smelter'))
+    const serviceBtn = Array.from(smelterCard?.querySelectorAll('button') || [])
+      .find(btn => !btn.textContent.includes('Buy'))
+    expect(serviceBtn?.disabled).toBe(true)
+  })
+
+  it('enables service button when days since service is greater than 0', () => {
+    // Create a state with an owned machine that has wear since last service
+    const enabledBtnState = { ...MOCK_STATE }
+    enabledBtnState.machines = { ...MOCK_STATE.machines }
+    enabledBtnState.machines.ingot = {
+      ...MOCK_STATE.machines.ingot,
+      days_since_service: 3  // Has days since last service, so button should be enabled
+    }
+    window.renderFactory(enabledBtnState)
+    const smelterCard = Array.from(document.querySelectorAll('#machine-list .machine-card'))
+      .find(card => card.textContent.includes('Smelter'))
+    const serviceBtn = Array.from(smelterCard?.querySelectorAll('button') || [])
+      .find(btn => !btn.textContent.includes('Buy'))
+    expect(serviceBtn?.disabled).toBe(false)
+  })
+
+  it('does not show "Life left" in machine stats', () => {
+    window.renderFactory(MOCK_STATE)
+    const factoryPanel = document.getElementById('tab-factory')
+    // Search for the text "Life left" or "machineLife" label
+    const hasLifeLeft = factoryPanel?.textContent.includes('Life left') || 
+                        factoryPanel?.textContent.includes('machineLife')
+    expect(hasLifeLeft).toBe(false)
+  })
+
+  it('shows only "Wear" in machine stats, not "Life left"', () => {
+    window.renderFactory(MOCK_STATE)
+    const cards = Array.from(document.querySelectorAll('#machine-list .machine-card'))
+    const smelterCard = cards.find(card => card.textContent.includes('Smelter'))
+    expect(smelterCard?.textContent).toContain('Wear: 3 / 60d')
+    expect(smelterCard?.textContent).not.toContain('Life:')
   })
 })
 

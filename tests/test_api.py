@@ -27,6 +27,8 @@ def rich_client() -> Generator[object, None, None]:
     """Client pre-loaded with workers, inventory, and a blueprint."""
     g = FactoryGame(seed=7)
     g.cash = 5000.0
+    g.buy_machine("ingot")
+    g.buy_machine("gear")
     g.hire(3)
     g.inventory["ore"] = 20
     g.inventory["ingot"] = 10
@@ -71,7 +73,7 @@ class TestApiState:
             "cash", "items", "recipes", "item_icons", "total_workers", "assigned_workers", "free_workers",
             "worker_hire_cost", "worker_fire_fee", "daily_salary",
             "inventory", "market_prices", "price_bounds", "price_history",
-            "price_change", "assignments", "automation_preview", "owned_blueprints",
+            "price_change", "assignments", "maintenance_strategies", "machines", "automation_preview", "owned_blueprints",
             "blueprints", "effective_recipes", "margins", "bankrupt",
         ]
         for field in required:
@@ -140,6 +142,17 @@ class TestApiState:
             assert "cost" in bp
             assert "description" in bp
             assert "owned" in bp
+
+    def test_machines_structure(self, client):
+        payload = client.get("/api/state").get_json()
+        for recipe, machine in payload["machines"].items():
+            assert recipe in payload["recipes"]
+            for field in [
+                "name", "owned", "status", "strategy", "preventive_interval",
+                "days_operated", "days_since_service", "maintenance_due",
+                "purchase_cost", "rated_lifetime_days", "remaining_life_days",
+            ]:
+                assert field in machine
 
 
 # ── /api/buy ─────────────────────────────────────────────────────────────────
@@ -225,6 +238,8 @@ class TestApiCraft:
         assert state["inventory"]["ingot"] == 12  # 10 existing + 2 crafted
 
     def test_missing_inputs_returns_error(self, client):
+        web_gui._game.cash = 1000.0
+        web_gui._game.buy_machine("widget")
         resp = client.post("/api/craft", json={"recipe": "widget", "qty": 1})
         assert "Missing required inputs" in resp.get_json()["message"]
 
@@ -255,6 +270,40 @@ class TestApiHire:
         client.post("/api/hire", json={"qty": 3})
         state = client.get("/api/state").get_json()
         assert state["daily_salary"] == pytest.approx(3 * web_gui._game.worker_salary)
+
+
+class TestApiMachines:
+    def test_buy_machine_returns_updated_state(self, client):
+        resp = client.post("/api/buy_machine", json={"recipe": "ingot"})
+
+        assert resp.status_code == 200
+        payload = resp.get_json()
+        assert payload["message"].startswith("Bought Smelter")
+        assert payload["state"]["machines"]["ingot"]["owned"] is True
+
+    def test_update_machine_settings_updates_strategy_and_interval(self, client):
+        client.post("/api/buy_machine", json={"recipe": "gear"})
+
+        resp = client.post(
+            "/api/update_machine_settings",
+            json={"recipe": "gear", "strategy": "preventive", "preventive_interval": 15},
+        )
+
+        payload = resp.get_json()
+        assert payload["message"].startswith("Updated Gear Press")
+        assert payload["state"]["machines"]["gear"]["strategy"] == "preventive"
+        assert payload["state"]["machines"]["gear"]["preventive_interval"] == 15
+
+    def test_service_machine_repairs_failed_machine(self, client):
+        web_gui._game.cash = 5000.0
+        web_gui._game.buy_machine("ingot")
+        web_gui._game.machines["ingot"]["status"] = "soft_failure"
+
+        resp = client.post("/api/service_machine", json={"recipe": "ingot"})
+
+        payload = resp.get_json()
+        assert payload["message"].startswith("Repaired Smelter")
+        assert payload["state"]["machines"]["ingot"]["status"] == "operational"
 
 
 # ── /api/fire ────────────────────────────────────────────────────────────────

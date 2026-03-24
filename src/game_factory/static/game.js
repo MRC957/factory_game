@@ -85,6 +85,25 @@ const I18N = {
     automationNote: "Workers produce 1 batch per assigned worker per day automatically.",
     automationPreviewTitle: "End-of-day automation preview",
     automationPreviewNone: "No automated output expected with current assignments and inputs.",
+    machineFleetTitle: "Machines",
+    machineNote: "Buy the required machine for each recipe, then keep it reliable with preventive maintenance or corrective repairs.",
+    machineRequired: "Required machine",
+    machineStatus: "Status",
+    machineStrategy: "Strategy",
+    machineInterval: "Interval",
+    machineWear: "Wear",
+    machineLife: "Life left",
+    machineBuy: "Buy machine",
+    machineService: "Service",
+    machineRepair: "Repair",
+    machineCorrective: "Corrective",
+    machinePreventive: "Preventive",
+    machineDue: "Maintenance due",
+    machineOwned: "Owned",
+    machineMissing: "Missing",
+    machineOperational: "Operational",
+    machineSoftFailure: "Soft failure",
+    machineHardFailure: "Hard failure",
     hoursToAdvance: "Hours to advance",
     advanceTime: "⏭ Advance Time",
     restOfDay: "Rest of day",
@@ -150,6 +169,25 @@ const I18N = {
     automationNote: "Chaque ouvrier affecté produit 1 lot par jour automatiquement.",
     automationPreviewTitle: "Aperçu de production automatique en fin de journée",
     automationPreviewNone: "Aucune production automatique attendue avec les affectations et stocks actuels.",
+    machineFleetTitle: "Machines",
+    machineNote: "Achetez la machine requise pour chaque recette, puis gardez-la fiable avec la maintenance préventive ou les réparations correctives.",
+    machineRequired: "Machine requise",
+    machineStatus: "État",
+    machineStrategy: "Stratégie",
+    machineInterval: "Intervalle",
+    machineWear: "Usure",
+    machineLife: "Vie restante",
+    machineBuy: "Acheter la machine",
+    machineService: "Maintenir",
+    machineRepair: "Réparer",
+    machineCorrective: "Corrective",
+    machinePreventive: "Préventive",
+    machineDue: "Maintenance due",
+    machineOwned: "Possédée",
+    machineMissing: "Absente",
+    machineOperational: "Opérationnelle",
+    machineSoftFailure: "Panne partielle",
+    machineHardFailure: "Panne majeure",
     hoursToAdvance: "Heures à avancer",
     advanceTime: "⏭ Avancer le temps",
     restOfDay: "Fin de journée",
@@ -219,6 +257,8 @@ function applyTranslations() {
   document.getElementById("btn-fire").textContent = t("fireWorkers");
   document.getElementById("automation-title").textContent = t("automationAssignment");
   document.getElementById("automation-note").textContent = t("automationNote");
+  document.getElementById("machine-fleet-title").textContent = t("machineFleetTitle");
+  document.getElementById("machine-note").textContent = t("machineNote");
   document.getElementById("hours-label").textContent = t("hoursToAdvance");
   document.getElementById("btn-advance-time").textContent = t("advanceTime");
   const hoursInput = document.getElementById("hours-input");
@@ -474,6 +514,26 @@ function renderMarket(s) {
       <td class="${cls}">${arrow} ${change > 0 ? "+" : ""}${change.toFixed(1)}%</td>`;
     tbody.appendChild(tr);
   });
+
+  // Disable buy/sell controls when market is closed
+  const isOpen = Boolean(s.market_is_open);
+  const buySellSection = document.querySelector('[id="buy-sell-title"]')?.closest('.card');
+  if (buySellSection) {
+    buySellSection.style.opacity = isOpen ? "1" : "0.5";
+    buySellSection.style.pointerEvents = isOpen ? "auto" : "none";
+  }
+  
+  // Disable individual controls as well
+  const buyButton = document.getElementById("btn-buy");
+  const sellButton = document.getElementById("btn-sell");
+  const maxBuyBtn = document.getElementById("btn-max-buy");
+  const maxSellBtn = document.getElementById("btn-max-sell");
+  const marketQtyInput = document.getElementById("market-qty");
+  if (buyButton) buyButton.disabled = !isOpen;
+  if (sellButton) sellButton.disabled = !isOpen;
+  if (maxBuyBtn) maxBuyBtn.disabled = !isOpen;
+  if (maxSellBtn) maxSellBtn.disabled = !isOpen;
+  if (marketQtyInput) marketQtyInput.disabled = !isOpen;
 }
 
 function renderInventory(s, targetId = "inventory-sidebar-grid") {
@@ -613,21 +673,120 @@ function renderFactory(s) {
   });
 
   const previewEl = document.getElementById("automation-preview");
-  if (!previewEl) return;
+  if (previewEl) {
+    const produced = s.automation_preview?.produced || {};
+    const orderedProducedItems = allItems(s).filter(item => (produced[item] ?? 0) > 0);
+    const producedText = orderedProducedItems
+      .map(item => `${produced[item]}× ${itemIcon(item)}<span class="item-name">${item}</span>`)
+      .join(", ");
 
-  const produced = s.automation_preview?.produced || {};
-
-  const orderedProducedItems = allItems(s).filter(item => (produced[item] ?? 0) > 0);
-  const producedText = orderedProducedItems
-    .map(item => `${produced[item]}× ${itemIcon(item)}<span class="item-name">${item}</span>`)
-    .join(", ");
-
-  if (!producedText) {
-    previewEl.innerHTML = `<strong>${t("automationPreviewTitle")}:</strong> ${t("automationPreviewNone")}`;
-    return;
+    if (!producedText) {
+      previewEl.innerHTML = `<strong>${t("automationPreviewTitle")}:</strong> ${t("automationPreviewNone")}`;
+    } else {
+      previewEl.innerHTML = `<strong>${t("automationPreviewTitle")}:</strong> ${producedText}`;
+    }
   }
 
-  previewEl.innerHTML = `<strong>${t("automationPreviewTitle")}:</strong> ${producedText}`;
+  renderMachines(s);
+}
+
+function machineStatusLabel(status) {
+  const map = {
+    missing: t("machineMissing"),
+    operational: t("machineOperational"),
+    soft_failure: t("machineSoftFailure"),
+    hard_failure: t("machineHardFailure"),
+  };
+  return map[status] ?? status;
+}
+
+function machineStrategyLabel(strategy) {
+  return strategy === "preventive" ? t("machinePreventive") : t("machineCorrective");
+}
+
+function renderMachines(s) {
+  const grid = document.getElementById("machine-list");
+  if (!grid) return;
+  grid.innerHTML = "";
+
+  const strategies = Array.isArray(s.maintenance_strategies) ? s.maintenance_strategies : ["corrective", "preventive"];
+  const intervalOptions = [5, 10, 15];
+
+  allRecipes(s).forEach(recipe => {
+    const machine = s.machines?.[recipe];
+    if (!machine) return;
+
+    const status = machine.owned ? machine.status : "missing";
+    const card = document.createElement("div");
+    card.className = `machine-card machine-${status}${machine.owned ? " machine-owned" : ""}`;
+
+    const strategyOptions = strategies
+      .map(strategy => `<option value="${strategy}" ${machine.strategy === strategy ? "selected" : ""}>${machineStrategyLabel(strategy)}</option>`)
+      .join("");
+    const selectedInterval = intervalOptions.includes(machine.preventive_interval) ? machine.preventive_interval : intervalOptions[0];
+    const intervalMarkup = intervalOptions
+      .map(interval => `<option value="${interval}" ${selectedInterval === interval ? "selected" : ""}>${interval}d</option>`)
+      .join("");
+    const showInterval = machine.strategy === "preventive";
+
+    if (!machine.owned) {
+      card.innerHTML = `
+        <div class="machine-head">
+          <div>
+            <div class="machine-name">${machine.name}</div>
+            <div class="machine-recipe">${t("machineRequired")}: ${itemIcon(recipe)}<span class="item-name">${recipe}</span></div>
+          </div>
+          <div class="machine-status missing">${t("machineMissing")}</div>
+        </div>
+        <div class="machine-stats">
+          <span>${t("machineWear")}: 0 / ${machine.rated_lifetime_days}d</span>
+        </div>
+        <button class="btn-primary" onclick="doBuyMachine('${recipe}')">${t("machineBuy")} (${fmt(machine.purchase_cost)})</button>`;
+      grid.appendChild(card);
+      return;
+    }
+
+    const serviceLabel = status === "soft_failure" || status === "hard_failure" ? t("machineRepair") : t("machineService");
+    const serviceCost = status === "soft_failure" || status === "hard_failure"
+      ? fmt(machine.emergency_repair_cost)
+      : fmt(machine.preventive_cost);
+    const serviceHours = status === "soft_failure" || status === "hard_failure"
+      ? machine.emergency_repair_hours
+      : machine.preventive_hours;
+    const dueNote = machine.maintenance_due ? `<div class="machine-status soft_failure">${t("machineDue")}</div>` : "";
+    const serviceButtonHTML = machine.days_since_service === 0
+      ? `<button class="btn-primary" onclick="doServiceMachine('${recipe}')" disabled>${serviceLabel} (${serviceCost}, ${serviceHours}h)</button>`
+      : `<button class="btn-primary" onclick="doServiceMachine('${recipe}')">${serviceLabel} (${serviceCost}, ${serviceHours}h)</button>`;
+
+    card.innerHTML = `
+      <div class="machine-head">
+        <div>
+          <div class="machine-name">${machine.name}</div>
+          <div class="machine-recipe">${t("machineRequired")}: ${itemIcon(recipe)}<span class="item-name">${recipe}</span></div>
+        </div>
+        <div class="machine-status ${status}">${machineStatusLabel(status)}</div>
+      </div>
+      <div class="machine-stats">
+        <span>${t("machineWear")}: ${machine.days_operated} / ${machine.rated_lifetime_days}d</span>
+        <span>Days since service: ${machine.days_since_service}d</span>
+        <span>${t("machineStrategy")}: ${machineStrategyLabel(machine.strategy)}</span>
+        <span>${t("machineInterval")}: ${machine.preventive_interval}d</span>
+      </div>
+      ${dueNote}
+      <div class="machine-controls">
+        <select id="machine-strategy-${recipe}" onchange="doUpdateMachineSettings('${recipe}')" aria-label="Machine strategy for ${recipe}">
+          ${strategyOptions}
+        </select>
+        ${showInterval
+          ? `<select id="machine-interval-${recipe}" onchange="doUpdateMachineSettings('${recipe}')" aria-label="Machine interval for ${recipe}">
+          ${intervalMarkup}
+        </select>`
+          : ""
+        }
+      </div>
+      ${serviceButtonHTML}`;
+    grid.appendChild(card);
+  });
 }
 
 function renderBlueprints(s) {
@@ -695,14 +854,18 @@ function updateRecipeInfo() {
   const recipe = document.getElementById("craft-recipe").value;
   const er = G.effective_recipes[recipe];
   if (!er) return;
+  const machine = G.machines?.[recipe];
   const inputs  = Object.entries(er.inputs)
     .map(([k, v]) => `${v}× ${itemIcon(k)}<span class="item-name">${k}</span>`)
     .join(", ");
   const outputs = Object.entries(er.outputs)
     .map(([k, v]) => `${v}× ${itemIcon(k)}<span class="item-name">${k}</span>`)
     .join(", ");
+  const machineText = machine
+    ? `<br><strong>${t("machineRequired")}:</strong> ${machine.name} (${machineStatusLabel(machine.owned ? machine.status : "missing")})`
+    : "";
   document.getElementById("recipe-info").innerHTML =
-    `<strong>${t("inputs")}:</strong> ${inputs}<br><strong>${t("outputs")}:</strong> ${outputs}`;
+    `<strong>${t("inputs")}:</strong> ${inputs}<br><strong>${t("outputs")}:</strong> ${outputs}${machineText}`;
 }
 
 function setMarketMax(mode) {
@@ -842,6 +1005,47 @@ async function doBuyBlueprint(name) {
   const r = await api("/api/buy_blueprint", { name });
   log(r.message, r.message.startsWith("Bought") ? "log-ok" : "log-err");
   render(r.state);
+}
+
+async function doBuyMachine(recipe) {
+  const r = await api("/api/buy_machine", { recipe });
+  log(r.message, r.message.startsWith("Bought") ? "log-ok" : "log-err");
+  renderAction(r.state, {
+    status: true,
+    inventory: true,
+    factory: true,
+    recipeInfo: true,
+  });
+}
+
+async function doUpdateMachineSettings(recipe) {
+  const strategy = document.getElementById(`machine-strategy-${recipe}`)?.value ?? "corrective";
+  const intervalValue = document.getElementById(`machine-interval-${recipe}`)?.value;
+  const payload = { recipe, strategy };
+  if (strategy === "preventive" && intervalValue != null) {
+    payload.preventive_interval = Number.parseInt(intervalValue, 10);
+  }
+  const r = await api("/api/update_machine_settings", payload);
+  log(r.message, r.message.startsWith("Updated") ? "log-ok" : "log-err");
+  renderAction(r.state, {
+    status: true,
+    factory: true,
+    recipeInfo: true,
+  });
+}
+
+async function doServiceMachine(recipe) {
+  const r = await api("/api/service_machine", { recipe });
+  log(
+    r.message,
+    r.message.startsWith("Performed") || r.message.startsWith("Repaired") ? "log-ok" : "log-err"
+  );
+  renderAction(r.state, {
+    status: true,
+    inventory: true,
+    factory: true,
+    recipeInfo: true,
+  });
 }
 
 async function doSave() {

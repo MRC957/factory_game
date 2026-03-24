@@ -28,6 +28,8 @@ def test_state_includes_price_bounds_and_history(client) -> None:
     assert "hour" in payload
     assert "clock" in payload
     assert "worker_fire_fee" in payload
+    assert "machines" in payload
+    assert "maintenance_strategies" in payload
     assert payload["price_history"][0]["day"] == 1
 
 
@@ -53,3 +55,12 @@ def test_fire_endpoint_returns_error_message_when_cash_too_low(client) -> None:
     payload = fire_response.get_json()
     assert payload["message"].startswith("Not enough cash to fire workers")
     assert payload["state"]["total_workers"] == 3
+
+
+def test_buy_machine_endpoint_marks_machine_owned(client) -> None:
+    response = client.post("/api/buy_machine", json={"recipe": "ingot"})
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["message"].startswith("Bought Smelter")
+    assert payload["state"]["machines"]["ingot"]["owned"] is True

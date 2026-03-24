@@ -305,6 +305,46 @@ describe('doAssign()', () => {
   })
 })
 
+// ── doBuyMachine / doUpdateMachineSettings / doServiceMachine ─────────────────
+
+describe('machine actions', () => {
+  beforeEach(() => {
+    window.renderFactory({ ...MOCK_STATE })
+  })
+
+  it('POSTs to /api/buy_machine with the recipe', async () => {
+    fetchMock.mockResolvedValueOnce({
+      json: async () => apiResponse('Bought Gear Press for $420.00.'),
+    })
+    await window.doBuyMachine('gear')
+    const [url, opts] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/buy_machine')
+    expect(JSON.parse(opts.body)).toMatchObject({ recipe: 'gear' })
+  })
+
+  it('POSTs to /api/update_machine_settings with strategy and interval', async () => {
+    fetchMock.mockResolvedValueOnce({
+      json: async () => apiResponse('Updated Smelter: strategy=preventive, interval=15 day(s).'),
+    })
+    document.getElementById('machine-strategy-scrap_mix').value = 'preventive'
+    document.getElementById('machine-interval-scrap_mix').value = '15'
+    await window.doUpdateMachineSettings('scrap_mix')
+    const [url, opts] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/update_machine_settings')
+    expect(JSON.parse(opts.body)).toMatchObject({ recipe: 'scrap_mix', strategy: 'preventive', preventive_interval: 15 })
+  })
+
+  it('POSTs to /api/service_machine with the recipe', async () => {
+    fetchMock.mockResolvedValueOnce({
+      json: async () => apiResponse('Repaired Recycler for $105.00.'),
+    })
+    await window.doServiceMachine('scrap_mix')
+    const [url, opts] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/service_machine')
+    expect(JSON.parse(opts.body)).toMatchObject({ recipe: 'scrap_mix' })
+  })
+})
+
 // ── doBuyBlueprint ────────────────────────────────────────────────────────────
 
 describe('doBuyBlueprint()', () => {

@@ -122,6 +122,12 @@ export function createDOM() {
     <span id="automation-title"></span>
     <span id="automation-note"></span>
     <div  id="assign-list"></div>
+    <div  id="automation-preview"></div>
+
+    <!-- Machines -->
+    <span id="machine-fleet-title"></span>
+    <span id="machine-note"></span>
+    <div id="machine-list"></div>
 
     <!-- Blueprints -->
     <div id="blueprints-grid"></div>

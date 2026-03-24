@@ -22,6 +22,8 @@ from game_factory.game import (
     ITEM_IDS,
     MARKET_CLOSE_HOUR,
     MARKET_OPEN_HOUR,
+    MACHINE_CATALOG,
+    MACHINE_STRATEGIES,
     RECIPE_IDS,
 )
 
@@ -131,6 +133,21 @@ def _game_state(compact: bool = False) -> dict[str, Any]:
         # price_change is stored as a fraction in the model; convert to % for display.
         "price_change": {k: round(v * 100, 1) for k, v in g.price_change.items()},
         "assignments": dict(g.assignments),
+        "maintenance_strategies": list(MACHINE_STRATEGIES),
+        "machines": {
+            recipe_name: {
+                **dict(g.machines[recipe_name]),
+                "name": MACHINE_CATALOG[recipe_name].name,
+                "purchase_cost": MACHINE_CATALOG[recipe_name].purchase_cost,
+                "rated_lifetime_days": MACHINE_CATALOG[recipe_name].rated_lifetime_days,
+                "preventive_cost": MACHINE_CATALOG[recipe_name].preventive_cost,
+                "preventive_hours": MACHINE_CATALOG[recipe_name].preventive_hours,
+                "emergency_repair_cost": MACHINE_CATALOG[recipe_name].emergency_repair_cost,
+                "emergency_repair_hours": MACHINE_CATALOG[recipe_name].emergency_repair_hours,
+                "remaining_life_days": g._machine_remaining_life(recipe_name),
+            }
+            for recipe_name in RECIPE_IDS
+        },
         "automation_preview": g.preview_end_of_day_automation(),
         "owned_blueprints": list(g.owned_blueprints),
         # Bankruptcy threshold is -$500 (a small grace buffer below zero).
@@ -224,6 +241,32 @@ def api_fire() -> Any:
 def api_assign() -> Any:
     data = request.get_json(force=True)
     msg = _current_game().assign(str(data["recipe"]), int(data["qty"]))
+    return jsonify({"message": msg, "state": _game_state(compact=True)})
+
+
+@app.route("/api/buy_machine", methods=["POST"])
+def api_buy_machine() -> Any:
+    data = request.get_json(force=True)
+    msg = _current_game().buy_machine(str(data["recipe"]))
+    return jsonify({"message": msg, "state": _game_state(compact=True)})
+
+
+@app.route("/api/update_machine_settings", methods=["POST"])
+def api_update_machine_settings() -> Any:
+    data = request.get_json(force=True)
+    preventive_interval = data.get("preventive_interval")
+    msg = _current_game().update_machine_settings(
+        str(data["recipe"]),
+        str(data["strategy"]),
+        int(preventive_interval) if preventive_interval is not None else None,
+    )
+    return jsonify({"message": msg, "state": _game_state(compact=True)})
+
+
+@app.route("/api/service_machine", methods=["POST"])
+def api_service_machine() -> Any:
+    data = request.get_json(force=True)
+    msg = _current_game().service_machine(str(data["recipe"]))
     return jsonify({"message": msg, "state": _game_state(compact=True)})
 
 

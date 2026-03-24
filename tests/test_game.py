@@ -19,6 +19,9 @@ def _game_with_cash(cash: float, seed: int = 0) -> FactoryGame:
 
 def _game_with_inventory(items: dict[str, int], cash: float = 500.0) -> FactoryGame:
     g = FactoryGame(seed=0)
+    g.cash = 10_000.0
+    for recipe_name in g.recipes:
+        g.buy_machine(recipe_name)
     g.cash = cash
     for k, v in items.items():
         g.inventory[k] = v
@@ -160,6 +163,8 @@ class TestCraftManual:
 
     def test_missing_inputs_returns_error(self):
         g = FactoryGame(seed=0)  # empty inventory
+        g.cash = 1000.0
+        g.buy_machine("ingot")
         msg = g.craft_manual("ingot", 1)
         assert "Missing required inputs" in msg
 
@@ -449,6 +454,7 @@ class TestNextDay:
     def test_automation_crafts_assigned_recipe(self):
         g = _game_with_cash(1000.0)
         g.inventory["ore"] = 20
+        g.buy_machine("ingot")
         g.hire(2)
         g.assign("ingot", 2)
         g.next_day()
@@ -459,6 +465,7 @@ class TestNextDay:
     def test_automation_output_in_message(self):
         g = _game_with_cash(1000.0)
         g.inventory["ore"] = 10
+        g.buy_machine("ingot")
         g.hire(3)
         g.assign("ingot", 3)
         msg = g.next_day()
@@ -527,6 +534,7 @@ class TestCraftingInternals:
     def test_craft_with_zero_output_input_ratio(self):
         """assembly_jigs makes widget free of ingot; crafting should still work."""
         g = _game_with_cash(2000.0)
+        g.buy_machine("widget")
         g.buy_blueprint("assembly_jigs")
         g.inventory["gear"] = 2
         g.inventory["ingot"] = 0
@@ -537,6 +545,7 @@ class TestCraftingInternals:
 
     def test_precision_molds_doubles_gear_output_over_two_rounds(self):
         g = _game_with_cash(2000.0)
+        g.buy_machine("gear")
         g.buy_blueprint("precision_molds")
         g.inventory["ingot"] = 4
         g.inventory["wood"] = 2

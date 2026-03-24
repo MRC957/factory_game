@@ -1,6 +1,6 @@
 # Game Factory MVP
 
-A Python web factory game MVP with a browser GUI: buy raw materials, craft products, hire workers for automation, unlock blueprints, and react to dynamic market prices.
+A Python web factory game MVP with a browser GUI: buy raw materials, buy and maintain machines, craft products, hire workers for automation, unlock blueprints, and react to dynamic market prices.
 
 ## Run locally
 
@@ -29,20 +29,29 @@ Then open `http://localhost:5000`.
 
 ## Gameplay (GUI)
 
-- Use the **Market** tab to buy/sell items.
-- Use the **Factory** tab for manual crafting and worker assignment.
+- Use the **Market** tab to buy/sell items (8:00-18:00 hours only).
+- Use the **Factory** tab for manual crafting, machine management, and worker assignment.
 - Use the **Blueprints** tab to purchase production upgrades.
 - Use the **Margins** tab to inspect current recipe profitability.
-- Use the bottom bar to advance days and view activity logs.
+- Use the bottom bar to advance time and view activity logs.
 
 ## MVP mechanics covered
 
-- Manual crafting at start.
+- 24h clock with action time costs and market open/closed state.
+- Machine purchase required before crafting each recipe.
+- Bathtub-style machine reliability with soft/hard failures and escalation.
+- Preventive maintenance (scheduled, 0.6× risk reduction) and corrective repair (run-to-failure).
+- Manual crafting gated by machine availability and condition.
 - Worker automation by recipe assignment.
 - Blueprint upgrades for recipe efficiency/output.
 - Not-always-profitable recipes.
 - Slightly dynamic daily prices.
 - Financial, market, and margin dashboards in the web UI.
+
+## Documentation
+
+- **[Machine Maintenance & Wear System](docs/machine_maintenance.md)** — Deep dive on failure mechanics, zones, strategies, and costs.
+- **[Game Design Document](docs/game_design.md)** — High-level design decisions and feature scope.
 
 ## Save system and sessions
 
