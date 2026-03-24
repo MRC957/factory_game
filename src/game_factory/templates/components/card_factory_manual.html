@@ -1,0 +1,25 @@
+<div class="card">
+  <div class="card-title" id="manual-crafting-title">Manual Crafting</div>
+  <div class="field">
+    <label for="craft-recipe" id="lbl-craft-recipe">Recipe</label>
+    <select id="craft-recipe" onchange="updateRecipeInfo()">
+      <option value="ingot">ingot</option>
+      <option value="gear">gear</option>
+      <option value="widget">widget</option>
+      <option value="scrap_mix">scrap_mix</option>
+    </select>
+  </div>
+  <div class="field">
+    <label for="craft-qty" id="lbl-craft-qty">Batches</label>
+    <div class="qty-stepper">
+      <button type="button" class="qty-stepper-btn" id="btn-qty-craft-dec" onclick="adjustCraftQty(-1)" aria-label="Decrease quantity">−</button>
+      <input type="text" id="craft-qty" value="1" inputmode="numeric" oninput="onCraftQtyInput()" aria-label="Craft batches">
+      <button type="button" class="qty-stepper-btn" id="btn-qty-craft-inc" onclick="adjustCraftQty(1)" aria-label="Increase quantity">+</button>
+    </div>
+  </div>
+  <div class="btn-row" style="margin-bottom:8px;">
+    <button class="btn-primary" id="btn-max-craft" onclick="setCraftMax()">Max Craft</button>
+  </div>
+  <div class="recipe-info" id="recipe-info">Select a recipe to see its inputs and outputs.</div>
+  <button class="btn-craft" id="btn-craft" onclick="doCraft()">Craft</button>
+</div>

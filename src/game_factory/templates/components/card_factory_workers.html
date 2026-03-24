@@ -1,0 +1,41 @@
+<div class="card">
+  <div class="card-title" id="workers-title">Workers</div>
+  <div class="field">
+    <label for="hire-qty" id="lbl-hire-qty">Hire quantity ($150 each)</label>
+    <div class="qty-stepper">
+      <button type="button" class="qty-stepper-btn" id="btn-qty-hire-dec" onclick="adjustHireQty(-1)" aria-label="Decrease quantity">−</button>
+      <input type="text" id="hire-qty" value="1" inputmode="numeric" oninput="onHireQtyInput()" aria-label="Hire quantity">
+      <button type="button" class="qty-stepper-btn" id="btn-qty-hire-inc" onclick="adjustHireQty(1)" aria-label="Increase quantity">+</button>
+    </div>
+  </div>
+  <div class="btn-row" style="margin-bottom:8px;">
+    <button class="btn-primary" id="btn-max-hire" onclick="setHireMax()">Max Hire</button>
+  </div>
+  <div style="margin-bottom:14px;">
+    <button class="btn-hire" id="btn-hire" onclick="doHire()">Hire Workers</button>
+  </div>
+
+  <div class="field">
+    <label for="fire-qty" id="lbl-fire-qty">Fire quantity ($40 fee each)</label>
+    <div class="qty-stepper">
+      <button type="button" class="qty-stepper-btn" id="btn-qty-fire-dec" onclick="adjustFireQty(-1)" aria-label="Decrease quantity">−</button>
+      <input type="text" id="fire-qty" value="1" inputmode="numeric" oninput="onFireQtyInput()" aria-label="Fire quantity">
+      <button type="button" class="qty-stepper-btn" id="btn-qty-fire-inc" onclick="adjustFireQty(1)" aria-label="Increase quantity">+</button>
+    </div>
+  </div>
+  <div class="btn-row" style="margin-bottom:8px;">
+    <button class="btn-primary" id="btn-max-fire" onclick="setFireMax()">Max Fire</button>
+  </div>
+  <div style="margin-bottom:14px;">
+    <button class="btn-sell" id="btn-fire" onclick="doFire()">Fire Workers</button>
+  </div>
+
+  <div class="card-title" id="automation-title" style="margin-top:12px;">Automation Assignment</div>
+  <div id="assign-list"></div>
+  <div id="automation-note" style="margin-top:10px; font-size:0.82rem; color:var(--muted);">
+    Workers produce 1 batch per assigned worker per day automatically.
+  </div>
+  <div class="recipe-info" id="automation-preview" style="margin-top:8px; margin-bottom:0;">
+    End-of-day automation preview will appear here.
+  </div>
+</div>

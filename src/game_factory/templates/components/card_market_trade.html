@@ -1,0 +1,20 @@
+<div class="card">
+  <div class="card-title" id="buy-sell-title">Buy / Sell</div>
+  <div class="field">
+    <label for="market-qty" id="lbl-market-qty">Quantity</label>
+    <div class="qty-stepper">
+      <button type="button" class="qty-stepper-btn" id="btn-qty-dec" onclick="adjustMarketQty(-1)" aria-label="Decrease quantity">−</button>
+      <input type="text" id="market-qty" value="1" inputmode="numeric" oninput="onMarketQtyInput()" aria-label="Market quantity">
+      <button type="button" class="qty-stepper-btn" id="btn-qty-inc" onclick="adjustMarketQty(1)" aria-label="Increase quantity">+</button>
+    </div>
+  </div>
+  <div class="btn-row" style="margin-bottom:8px;">
+    <button class="btn-primary" id="btn-max-buy" onclick="setMarketMax('buy')">Max Buy</button>
+    <button class="btn-primary" id="btn-max-sell" onclick="setMarketMax('sell')">Max Sell</button>
+  </div>
+  <div class="cost-preview"><span id="lbl-total">Total</span>: <span id="cost-preview">$0.00</span></div>
+  <div class="btn-row">
+    <button class="btn-buy" id="btn-buy" onclick="doBuy()">Buy</button>
+    <button class="btn-sell" id="btn-sell" onclick="doSell()">Sell</button>
+  </div>
+</div>
