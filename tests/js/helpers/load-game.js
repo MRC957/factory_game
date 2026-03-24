@@ -1,5 +1,5 @@
 /**
- * Loads game.js into the current jsdom window via window.eval().
+ * Loads client scripts into the current jsdom window via one combined eval().
  *
  * window.eval() (jsdom's custom eval) runs code in the jsdom global scope,
  * making every top-level `function` declaration available as window.<name>.
@@ -15,7 +15,13 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join }  from 'node:path'
 
 const __dir  = dirname(fileURLToPath(import.meta.url))
-const GAME_JS = join(__dir, '../../../src/game_factory/static/game.js')
+const CLIENT_JS = [
+  join(__dir, '../../../src/game_factory/static/js/state.js'),
+  join(__dir, '../../../src/game_factory/static/js/utils.js'),
+  join(__dir, '../../../src/game_factory/static/js/render.js'),
+  join(__dir, '../../../src/game_factory/static/js/actions.js'),
+  join(__dir, '../../../src/game_factory/static/js/boot.js'),
+]
 
 let loaded = false
 
@@ -23,7 +29,7 @@ export async function loadGame(mockState) {
   // Reset the loaded flag so each test file gets a fresh script evaluation.
   loaded = false
 
-  const code = readFileSync(GAME_JS, 'utf-8')
+  const code = CLIENT_JS.map(path => readFileSync(path, 'utf-8')).join('\n\n')
   // window.eval executes in the jsdom window's global scope.
   window.eval(code)
   loaded = true
