@@ -492,4 +492,26 @@ describe('doAdvanceTime()', () => {
     await window.doAdvanceTime()
     expect(document.getElementById('stat-time').textContent).toBe('16:00')
   })
+
+  it('advances to next market opening on same day when before open', async () => {
+    window.render(cloneState({ hour: 6, market_open_hour: 8 }))
+    fetchMock.mockResolvedValueOnce({
+      json: async () => ({ message: 'Advanced 2h.', state: cloneState({ hour: 8, clock: '08:00' }) }),
+    })
+    document.getElementById('hours-input').value = 'market_open'
+    await window.doAdvanceTime()
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body.hours).toBe(2)
+  })
+
+  it('advances to next market opening on next day when already open', async () => {
+    window.render(cloneState({ hour: 10, market_open_hour: 8 }))
+    fetchMock.mockResolvedValueOnce({
+      json: async () => ({ message: 'Advanced 22h.', state: cloneState({ day: 2, hour: 8, clock: '08:00' }) }),
+    })
+    document.getElementById('hours-input').value = 'market_open'
+    await window.doAdvanceTime()
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body.hours).toBe(22)
+  })
 })

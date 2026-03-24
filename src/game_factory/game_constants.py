@@ -69,8 +69,8 @@ ITEM_CATALOG: dict[str, dict[str, float | str]] = {
     ItemName.ORE.value: {"icon": "🪨", "base_price": 12.0, "min_price": 6.0, "max_price": 28.0},
     ItemName.WOOD.value: {"icon": "🪵", "base_price": 9.0, "min_price": 5.0, "max_price": 24.0},
     ItemName.INGOT.value: {"icon": "🔩", "base_price": 35.0, "min_price": 18.0, "max_price": 78.0},
-    ItemName.GEAR.value: {"icon": "⚙️", "base_price": 85.0, "min_price": 45.0, "max_price": 170.0},
-    ItemName.WIDGET.value: {"icon": "📦", "base_price": 190.0, "min_price": 95.0, "max_price": 380.0},
+    ItemName.GEAR.value: {"icon": "⚙️", "base_price": 120.0, "min_price": 70.0, "max_price": 240.0},
+    ItemName.WIDGET.value: {"icon": "📦", "base_price": 280.0, "min_price": 160.0, "max_price": 560.0},
     ItemName.SCRAP.value: {"icon": "🗑️", "base_price": 4.0, "min_price": 1.5, "max_price": 12.0},
 }
 ITEM_IDS: tuple[str, ...] = tuple(ITEM_CATALOG.keys())

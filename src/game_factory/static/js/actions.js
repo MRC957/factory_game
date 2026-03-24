@@ -121,6 +121,14 @@ function resolveAdvanceHours() {
     const remaining = 24 - (G.hour ?? 0);
     return Math.max(1, remaining);
   }
+  if (value === "market_open") {
+    const hour = G.hour ?? 0;
+    const marketOpenHour = G.market_open_hour ?? 8;
+    if (hour < marketOpenHour) {
+      return Math.max(1, marketOpenHour - hour);
+    }
+    return Math.max(1, (24 - hour) + marketOpenHour);
+  }
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 }

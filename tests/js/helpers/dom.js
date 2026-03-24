@@ -143,6 +143,7 @@ export function createDOM() {
       <option value="4">+4h</option>
       <option value="8">+8h</option>
       <option value="rest">Rest of day</option>
+      <option value="market_open">To next market opening</option>
     </select>
     <button id="btn-advance-time"></button>
     <input id="save-slot" type="text" value="default" />
