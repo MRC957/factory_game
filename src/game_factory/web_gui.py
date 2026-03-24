@@ -17,7 +17,9 @@ from typing import Any
 from flask import Flask, jsonify, render_template, request, session
 
 from game_factory.game import (
-    FactoryGame,
+    FactoryGame
+)
+from game_factory.game_constants  import (
     ITEM_CATALOG,
     ITEM_IDS,
     MARKET_CLOSE_HOUR,
