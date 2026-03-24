@@ -1,7 +1,42 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import Dict
+
+
+class ItemName(str, Enum):
+    ORE = "ore"
+    WOOD = "wood"
+    INGOT = "ingot"
+    GEAR = "gear"
+    WIDGET = "widget"
+    SCRAP = "scrap"
+
+
+class RecipeName(str, Enum):
+    INGOT = "ingot"
+    GEAR = "gear"
+    WIDGET = "widget"
+    SCRAP_MIX = "scrap_mix"
+
+
+class MachineStatus(str, Enum):
+    MISSING = "missing"
+    OPERATIONAL = "operational"
+    SOFT_FAILURE = "soft_failure"
+    HARD_FAILURE = "hard_failure"
+
+
+class MachineFailureZone(str, Enum):
+    INFANT = "infant"
+    USEFUL = "useful"
+    WEAR_OUT = "wear_out"
+
+
+class MaintenanceStrategy(str, Enum):
+    CORRECTIVE = "corrective"
+    PREVENTIVE = "preventive"
 
 
 @dataclass(frozen=True)
@@ -31,31 +66,32 @@ class MachineSpec:
 
 
 ITEM_CATALOG: dict[str, dict[str, float | str]] = {
-    "ore": {"icon": "🪨", "base_price": 12.0, "min_price": 6.0, "max_price": 28.0},
-    "wood": {"icon": "🪵", "base_price": 9.0, "min_price": 5.0, "max_price": 24.0},
-    "ingot": {"icon": "🔩", "base_price": 35.0, "min_price": 18.0, "max_price": 78.0},
-    "gear": {"icon": "⚙️", "base_price": 85.0, "min_price": 45.0, "max_price": 170.0},
-    "widget": {"icon": "📦", "base_price": 190.0, "min_price": 95.0, "max_price": 380.0},
-    "scrap": {"icon": "🗑️", "base_price": 4.0, "min_price": 1.5, "max_price": 12.0},
+    ItemName.ORE.value: {"icon": "🪨", "base_price": 12.0, "min_price": 6.0, "max_price": 28.0},
+    ItemName.WOOD.value: {"icon": "🪵", "base_price": 9.0, "min_price": 5.0, "max_price": 24.0},
+    ItemName.INGOT.value: {"icon": "🔩", "base_price": 35.0, "min_price": 18.0, "max_price": 78.0},
+    ItemName.GEAR.value: {"icon": "⚙️", "base_price": 85.0, "min_price": 45.0, "max_price": 170.0},
+    ItemName.WIDGET.value: {"icon": "📦", "base_price": 190.0, "min_price": 95.0, "max_price": 380.0},
+    ItemName.SCRAP.value: {"icon": "🗑️", "base_price": 4.0, "min_price": 1.5, "max_price": 12.0},
 }
 ITEM_IDS: tuple[str, ...] = tuple(ITEM_CATALOG.keys())
 
 RECIPE_CATALOG: dict[str, Recipe] = {
-    "ingot": Recipe("ingot", {"ore": 2}, {"ingot": 1}),
-    "gear": Recipe("gear", {"ingot": 2, "wood": 1}, {"gear": 1}),
-    "widget": Recipe("widget", {"gear": 1, "ingot": 1}, {"widget": 1}),
-    "scrap_mix": Recipe("scrap_mix", {"ore": 1, "wood": 1}, {"scrap": 1}),
+    RecipeName.INGOT.value: Recipe(RecipeName.INGOT.value, {ItemName.ORE.value: 2}, {ItemName.INGOT.value: 1}),
+    RecipeName.GEAR.value: Recipe(RecipeName.GEAR.value, {ItemName.INGOT.value: 2, ItemName.WOOD.value: 1}, {ItemName.GEAR.value: 1}),
+    RecipeName.WIDGET.value: Recipe(RecipeName.WIDGET.value, {ItemName.GEAR.value: 1, ItemName.INGOT.value: 1}, {ItemName.WIDGET.value: 1}),
+    RecipeName.SCRAP_MIX.value: Recipe(RecipeName.SCRAP_MIX.value, {ItemName.ORE.value: 1, ItemName.WOOD.value: 1}, {ItemName.SCRAP.value: 1}),
 }
 RECIPE_IDS: tuple[str, ...] = tuple(RECIPE_CATALOG.keys())
 
 MACHINE_CATALOG: dict[str, MachineSpec] = {
-    "ingot": MachineSpec("ingot", "Smelter", 260.0, 60, 45.0, 3, 135.0, 6),
-    "gear": MachineSpec("gear", "Gear Press", 420.0, 60, 70.0, 3, 210.0, 6),
-    "widget": MachineSpec("widget", "Assembly Bench", 620.0, 60, 95.0, 4, 285.0, 7),
-    "scrap_mix": MachineSpec("scrap_mix", "Recycler", 180.0, 60, 35.0, 2, 105.0, 4),
+    RecipeName.INGOT.value: MachineSpec(RecipeName.INGOT.value, "Smelter", 260.0, 60, 45.0, 3, 135.0, 6),
+    RecipeName.GEAR.value: MachineSpec(RecipeName.GEAR.value, "Gear Press", 420.0, 60, 70.0, 3, 210.0, 6),
+    RecipeName.WIDGET.value: MachineSpec(RecipeName.WIDGET.value, "Assembly Bench", 620.0, 60, 95.0, 4, 285.0, 7),
+    RecipeName.SCRAP_MIX.value: MachineSpec(RecipeName.SCRAP_MIX.value, "Recycler", 180.0, 60, 35.0, 2, 105.0, 4),
 }
 MACHINE_IDS: tuple[str, ...] = tuple(MACHINE_CATALOG.keys())
-MACHINE_STRATEGIES: tuple[str, ...] = ("corrective", "preventive")
+MACHINE_STRATEGIES: tuple[str, ...] = tuple(strategy.value for strategy in MaintenanceStrategy)
+MACHINE_STATUSES: tuple[str, ...] = tuple(status.value for status in MachineStatus)
 DEFAULT_PREVENTIVE_INTERVAL = 10
 
 HOURS_PER_DAY = 24

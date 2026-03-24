@@ -302,8 +302,24 @@ class TestApiMachines:
         resp = client.post("/api/service_machine", json={"recipe": "ingot"})
 
         payload = resp.get_json()
-        assert payload["message"].startswith("Repaired Smelter")
+        assert payload["message"].startswith("Performed preventive maintenance on Smelter")
         assert payload["state"]["machines"]["ingot"]["status"] == "operational"
+
+    def test_update_machine_settings_is_blocked_when_maintenance_due(self, client):
+        web_gui._game.cash = 5000.0
+        web_gui._game.buy_machine("gear")
+        web_gui._game.update_machine_settings("gear", "preventive", 5)
+        web_gui._game.machines["gear"]["days_since_service"] = 5
+        web_gui._game.machines["gear"]["maintenance_due"] = True
+
+        resp = client.post(
+            "/api/update_machine_settings",
+            json={"recipe": "gear", "strategy": "corrective"},
+        )
+
+        payload = resp.get_json()
+        assert payload["message"].startswith("Gear Press maintenance is due")
+        assert payload["state"]["machines"]["gear"]["strategy"] == "preventive"
 
 
 # ── /api/fire ────────────────────────────────────────────────────────────────

@@ -3,7 +3,7 @@ from __future__ import annotations
 from math import floor
 from typing import Any
 
-from game_factory.game_constants import MANUAL_CRAFT_HOURS, NIGHT_MARKET_SURCHARGE
+from game_factory.game_constants import MANUAL_CRAFT_HOURS, NIGHT_MARKET_SURCHARGE, MachineStatus
 
 
 class _GameplayContext:
@@ -123,7 +123,7 @@ class GameplayActionsMixin(_GameplayContext):
         per_batch_hours = MANUAL_CRAFT_HOURS.get(recipe_name, 2)
         time_report = self._consume_action_time(per_batch_hours * done)
         machine = self._machine_state(recipe_name)
-        suffix = " (soft failure reduced throughput)" if machine["status"] == "soft_failure" else ""
+        suffix = " (soft failure reduced throughput)" if machine["status"] == MachineStatus.SOFT_FAILURE.value else ""
         if done < qty:
             return f"Crafted {done}/{qty} batches of {recipe_name} (inputs or machine capacity limited){suffix}.\n{time_report}"
         return f"Crafted {done} batches of {recipe_name}{suffix}.\n{time_report}"

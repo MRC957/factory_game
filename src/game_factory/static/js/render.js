@@ -300,11 +300,11 @@ function renderMachines(s) {
       return;
     }
 
-    const serviceLabel = status === "soft_failure" || status === "hard_failure" ? t("machineRepair") : t("machineService");
-    const serviceCost = status === "soft_failure" || status === "hard_failure"
+    const serviceLabel = status === "hard_failure" ? t("machineRepair") : t("machineService");
+    const serviceCost = status === "hard_failure"
       ? fmt(machine.emergency_repair_cost)
       : fmt(machine.preventive_cost);
-    const serviceHours = status === "soft_failure" || status === "hard_failure"
+    const serviceHours = status === "hard_failure"
       ? machine.emergency_repair_hours
       : machine.preventive_hours;
     const dueNote = machine.maintenance_due ? `<div class="machine-status soft_failure">${t("machineDue")}</div>` : "";
@@ -416,8 +416,9 @@ function updateRecipeInfo() {
     .map(([k, v]) => `${v}× ${itemIcon(k)}<span class="item-name">${k}</span>`)
     .join(", ");
   const machineMissing = Boolean(machine && !machine.owned);
+  const machineFailed = Boolean(machine && machine.owned && (machine.status === "soft_failure" || machine.status === "hard_failure"));
   const machineText = machine
-    ? `<br><strong>${t("machineRequired")}:</strong> <span class="${machineMissing ? "loss" : ""}">${machine.name} (${machineStatusLabel(machine.owned ? machine.status : "missing")})</span>`
+    ? `<br><strong>${t("machineRequired")}:</strong> <span class="${machineMissing || machineFailed ? "loss" : ""}">${machine.name} (${machineStatusLabel(machine.owned ? machine.status : "missing")})</span>`
     : "";
   document.getElementById("recipe-info").innerHTML =
     `<strong>${t("inputs")}:</strong> ${inputs}<br><strong>${t("outputs")}:</strong> ${outputs}${machineText}`;

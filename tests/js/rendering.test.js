@@ -496,4 +496,16 @@ describe('updateRecipeInfo()', () => {
     expect(info).toContain('class="loss"')
     expect(info).toContain('Missing')
   })
+
+  it('highlights soft/hard failed machine status in red (loss class)', () => {
+    const state = cloneState(MOCK_STATE)
+    state.machines.ingot.owned = true
+    state.machines.ingot.status = 'soft_failure'
+    window.render(state)
+    document.getElementById('craft-recipe').value = 'ingot'
+    window.updateRecipeInfo()
+    const info = document.getElementById('recipe-info').innerHTML
+    expect(info).toContain('class="loss"')
+    expect(info).toContain('Soft failure')
+  })
 })

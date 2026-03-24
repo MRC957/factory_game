@@ -188,3 +188,47 @@ def test_preventive_maintenance_resets_due_counter() -> None:
     assert game.machines["gear"]["days_since_service"] == 0
     assert game.machines["gear"]["maintenance_due"] is False
     assert game.hour == 12
+
+
+def test_soft_failure_is_serviced_with_standard_maintenance() -> None:
+    game = FactoryGame(seed=5)
+    game.cash = 5000.0
+    assert game.buy_machine("ingot").startswith("Bought Smelter")
+    game.machines["ingot"]["status"] = "soft_failure"
+
+    cash_before = game.cash
+    message = game.service_machine("ingot")
+
+    assert message.startswith("Performed preventive maintenance on Smelter")
+    assert game.machines["ingot"]["status"] == "operational"
+    assert game.cash == pytest.approx(cash_before - 45.0)
+
+
+def test_cannot_change_machine_settings_when_maintenance_is_due() -> None:
+    game = FactoryGame(seed=5)
+    game.cash = 5000.0
+    assert game.buy_machine("gear").startswith("Bought Gear Press")
+    assert game.update_machine_settings("gear", "preventive", 5).startswith("Updated Gear Press")
+    game.machines["gear"]["days_since_service"] = 5
+    game.machines["gear"]["maintenance_due"] = True
+
+    message = game.update_machine_settings("gear", "corrective")
+
+    assert message.startswith("Gear Press maintenance is due")
+    assert game.machines["gear"]["strategy"] == "preventive"
+
+
+def test_shorter_preventive_interval_gives_stronger_risk_reduction() -> None:
+    game = FactoryGame(seed=5)
+    game.cash = 5000.0
+    assert game.buy_machine("gear").startswith("Bought Gear Press")
+    game.machines["gear"]["days_operated"] = 20
+    game.machines["gear"]["days_since_service"] = 0
+
+    game.update_machine_settings("gear", "preventive", 5)
+    short_interval_chance = game._machine_failure_chance("gear")
+
+    game.update_machine_settings("gear", "preventive", 15)
+    long_interval_chance = game._machine_failure_chance("gear")
+
+    assert short_interval_chance < long_interval_chance

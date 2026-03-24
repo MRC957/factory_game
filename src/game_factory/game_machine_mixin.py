@@ -7,6 +7,9 @@ from game_factory.game_constants import (
     MACHINE_CATALOG,
     MACHINE_STRATEGIES,
     MachineSpec,
+    MachineFailureZone,
+    MachineStatus,
+    MaintenanceStrategy,
 )
 
 
@@ -29,9 +32,9 @@ class MachineLifecycleMixin(_MachineContext):
 
     def _machine_capacity(self, recipe_name: str, requested_batches: int) -> int:
         machine = self._machine_state(recipe_name)
-        if machine["status"] == "hard_failure":
+        if machine["status"] == MachineStatus.HARD_FAILURE.value:
             return 0
-        if machine["status"] == "soft_failure":
+        if machine["status"] == MachineStatus.SOFT_FAILURE.value:
             return max(1, (requested_batches + 1) // 2)
         return requested_batches
 
@@ -48,7 +51,7 @@ class MachineLifecycleMixin(_MachineContext):
         spec = self._machine_spec(recipe_name)
         if not machine["owned"]:
             return f"Missing machine: buy the {spec.name} before crafting {recipe_name}."
-        if machine["status"] == "hard_failure":
+        if machine["status"] == MachineStatus.HARD_FAILURE.value:
             return f"{spec.name} has a hard failure. Repair it before crafting {recipe_name}."
         return None
 
@@ -61,18 +64,23 @@ class MachineLifecycleMixin(_MachineContext):
         # - middle life has low/steady risk,
         # - end-of-life has sharply rising risk.
         if days <= 5:
-            return "infant"
+            return MachineFailureZone.INFANT.value
         if days >= spec.rated_lifetime_days - 10:
-            return "wear_out"
-        return "useful"
+            return MachineFailureZone.WEAR_OUT.value
+        return MachineFailureZone.USEFUL.value
+
+    def _preventive_on_schedule_modifier(self, preventive_interval: int) -> float:
+        interval = max(3, min(20, int(preventive_interval)))
+        normalized = (interval - 3) / 17
+        return 0.45 + normalized * 0.35
 
     def _machine_failure_chance(self, recipe_name: str) -> float:
         machine = self._machine_state(recipe_name)
         zone = self._machine_failure_zone(recipe_name)
         # Base daily failure chance by reliability zone.
-        if zone == "infant":
+        if zone == MachineFailureZone.INFANT.value:
             chance = 0.12
-        elif zone == "wear_out":
+        elif zone == MachineFailureZone.WEAR_OUT.value:
             remaining = max(0, self._machine_remaining_life(recipe_name))
             # Wear-out risk increases as remaining life approaches 0.
             chance = 0.12 + (10 - min(10, remaining)) * 0.02
@@ -81,9 +89,9 @@ class MachineLifecycleMixin(_MachineContext):
 
         # Preventive strategy reduces risk while maintenance is on schedule,
         # but becomes riskier when running overdue.
-        if machine["strategy"] == "preventive":
+        if machine["strategy"] == MaintenanceStrategy.PREVENTIVE.value:
             if machine["days_since_service"] <= machine["preventive_interval"]:
-                chance *= 0.6
+                chance *= self._preventive_on_schedule_modifier(machine["preventive_interval"])
             else:
                 chance *= 1.4
         return min(0.95, chance)
@@ -97,7 +105,7 @@ class MachineLifecycleMixin(_MachineContext):
         chance = self._machine_failure_chance(recipe_name)
         # No failure today. If preventive maintenance is due, surface a reminder.
         if self.rng.random() >= chance:
-            if machine["strategy"] == "preventive" and machine["maintenance_due"]:
+            if machine["strategy"] == MaintenanceStrategy.PREVENTIVE.value and machine["maintenance_due"]:
                 return f"{spec.name} preventive maintenance is due."
             return None
 
@@ -106,15 +114,15 @@ class MachineLifecycleMixin(_MachineContext):
         # - soft failures can escalate to hard failures on a later event,
         # - wear-out (or zero life left) fails hard immediately,
         # - otherwise roll for hard vs soft based on zone-specific bias.
-        if machine["status"] == "soft_failure":
+        if machine["status"] == MachineStatus.SOFT_FAILURE.value:
             hard_failure = True
-        elif zone == "wear_out" or self._machine_remaining_life(recipe_name) == 0:
+        elif zone == MachineFailureZone.WEAR_OUT.value or self._machine_remaining_life(recipe_name) == 0:
             hard_failure = True
         else:
-            hard_bias = 0.30 if zone == "infant" else 0.18
+            hard_bias = 0.30 if zone == MachineFailureZone.INFANT.value else 0.18
             hard_failure = self.rng.random() < hard_bias
 
-        machine["status"] = "hard_failure" if hard_failure else "soft_failure"
+        machine["status"] = MachineStatus.HARD_FAILURE.value if hard_failure else MachineStatus.SOFT_FAILURE.value
         machine["maintenance_due"] = True
         failure_kind = "hard failure" if hard_failure else "soft failure"
         return f"{spec.name} suffered a {failure_kind}."
@@ -131,11 +139,11 @@ class MachineLifecycleMixin(_MachineContext):
                 machine["days_operated"] += 1
                 machine["days_since_service"] += 1
             machine["maintenance_due"] = (
-                machine["strategy"] == "preventive"
+                machine["strategy"] == MaintenanceStrategy.PREVENTIVE.value
                 and machine["days_since_service"] >= machine["preventive_interval"]
             )
             # We roll failure checks on used machines once per day rollover.
-            if used and machine["status"] != "hard_failure":
+            if used and machine["status"] != MachineStatus.HARD_FAILURE.value:
                 failure_line = self._roll_machine_failure(recipe_name)
                 if failure_line:
                     lines.append(failure_line)
@@ -156,8 +164,8 @@ class MachineLifecycleMixin(_MachineContext):
         self.cash -= spec.purchase_cost
         machine.update({
             "owned": True,
-            "status": "operational",
-            "strategy": "corrective",
+            "status": MachineStatus.OPERATIONAL.value,
+            "strategy": MaintenanceStrategy.CORRECTIVE.value,
             "preventive_interval": DEFAULT_PREVENTIVE_INTERVAL,
             "days_operated": 0,
             "days_since_service": 0,
@@ -176,13 +184,19 @@ class MachineLifecycleMixin(_MachineContext):
         if not machine["owned"]:
             return f"Missing machine: buy the {spec.name} first."
 
+        is_due_now = bool(machine["maintenance_due"])
+        if machine["strategy"] == MaintenanceStrategy.PREVENTIVE.value:
+            is_due_now = is_due_now or machine["days_since_service"] >= machine["preventive_interval"]
+        if is_due_now and (strategy != machine["strategy"] or preventive_interval is not None):
+            return f"{spec.name} maintenance is due. Service the machine before changing settings."
+
         machine["strategy"] = strategy
         if preventive_interval is not None:
             if preventive_interval < 3 or preventive_interval > 20:
                 return "Preventive interval must be between 3 and 20 operating days."
             machine["preventive_interval"] = preventive_interval
         machine["maintenance_due"] = (
-            strategy == "preventive"
+            strategy == MaintenanceStrategy.PREVENTIVE.value
             and machine["days_since_service"] >= machine["preventive_interval"]
         )
         return (
@@ -199,13 +213,13 @@ class MachineLifecycleMixin(_MachineContext):
         if not machine["owned"]:
             return f"Missing machine: buy the {spec.name} first."
 
-        if machine["status"] in {"soft_failure", "hard_failure"}:
+        if machine["status"] == MachineStatus.HARD_FAILURE.value:
             cost = spec.emergency_repair_cost
             hours = spec.emergency_repair_hours
             if self.cash < cost:
                 return f"Not enough cash. Need ${cost:.2f}, have ${self.cash:.2f}."
             self.cash -= cost
-            machine["status"] = "operational"
+            machine["status"] = MachineStatus.OPERATIONAL.value
             machine["days_since_service"] = 0
             machine["maintenance_due"] = False
             self._machines_used_today[recipe_name] = False
@@ -217,6 +231,7 @@ class MachineLifecycleMixin(_MachineContext):
             return f"Not enough cash. Need ${cost:.2f}, have ${self.cash:.2f}."
 
         self.cash -= cost
+        machine["status"] = MachineStatus.OPERATIONAL.value
         machine["days_since_service"] = 0
         machine["maintenance_due"] = False
         self._machines_used_today[recipe_name] = False

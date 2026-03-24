@@ -10,10 +10,13 @@ from .game_constants import (
     HOURS_PER_DAY,
     ITEM_CATALOG,
     MACHINE_CATALOG,
+    MACHINE_STATUSES,
     MACHINE_STRATEGIES,
     MARKET_CLOSE_HOUR,
     MARKET_OPEN_HOUR,
     Blueprint,
+    MachineStatus,
+    MaintenanceStrategy,
     Recipe,
     RECIPE_CATALOG,
 )
@@ -57,8 +60,8 @@ class FactoryGame(MachineLifecycleMixin, GameplayActionsMixin):
         self.machines: Dict[str, Dict[str, Any]] = {
             recipe_name: {
                 "owned": False,
-                "status": "missing",
-                "strategy": "corrective",
+                "status": MachineStatus.MISSING.value,
+                "strategy": MaintenanceStrategy.CORRECTIVE.value,
                 "preventive_interval": DEFAULT_PREVENTIVE_INTERVAL,
                 "days_operated": 0,
                 "days_since_service": 0,
@@ -150,12 +153,12 @@ class FactoryGame(MachineLifecycleMixin, GameplayActionsMixin):
                     raw_machine.get("owned", machine["owned"]))
                 machine["status"] = str(
                     raw_machine.get("status", machine["status"]))
-                if machine["status"] not in {"missing", "operational", "soft_failure", "hard_failure"}:
-                    machine["status"] = "operational" if machine["owned"] else "missing"
+                if machine["status"] not in MACHINE_STATUSES:
+                    machine["status"] = MachineStatus.OPERATIONAL.value if machine["owned"] else MachineStatus.MISSING.value
                 machine["strategy"] = str(raw_machine.get(
                     "strategy", machine["strategy"]))
                 if machine["strategy"] not in MACHINE_STRATEGIES:
-                    machine["strategy"] = "corrective"
+                    machine["strategy"] = MaintenanceStrategy.CORRECTIVE.value
                 machine["preventive_interval"] = max(
                     3,
                     int(raw_machine.get("preventive_interval",
@@ -168,7 +171,7 @@ class FactoryGame(MachineLifecycleMixin, GameplayActionsMixin):
                 machine["maintenance_due"] = bool(raw_machine.get(
                     "maintenance_due", machine["maintenance_due"]))
                 if not machine["owned"]:
-                    machine["status"] = "missing"
+                    machine["status"] = MachineStatus.MISSING.value
                     machine["days_operated"] = 0
                     machine["days_since_service"] = 0
                     machine["maintenance_due"] = False
@@ -229,7 +232,7 @@ class FactoryGame(MachineLifecycleMixin, GameplayActionsMixin):
             if not machine["owned"]:
                 lines.append(f"Automation {recipe_name}: missing {spec.name}.")
                 continue
-            if machine["status"] == "hard_failure":
+            if machine["status"] == MachineStatus.HARD_FAILURE.value:
                 lines.append(
                     f"Automation {recipe_name}: blocked by {spec.name} hard failure.")
                 continue
@@ -259,7 +262,7 @@ class FactoryGame(MachineLifecycleMixin, GameplayActionsMixin):
                     produced[item] = produced.get(item, 0) + amount
                 self._mark_machine_used(recipe_name)
 
-            suffix = " (soft failure)" if machine["status"] == "soft_failure" else ""
+            suffix = " (soft failure)" if machine["status"] == MachineStatus.SOFT_FAILURE.value else ""
             lines.append(
                 f"Automation {recipe_name}: {craftable}/{workers} batch(es){suffix}")
 

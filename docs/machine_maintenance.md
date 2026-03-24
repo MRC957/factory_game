@@ -12,16 +12,16 @@ All machines follow the classic **bathtub curve** reliability model, dividing eq
 
 ```
 Failure Rate
-    ▲
-    │     ╱╲
-    │    ╱  ╲___╱╲╲
-    │   ╱        ╲ ╲╲
-    │  ╱          ╲___╲╲╲
-    │                    ╲╲╲╲
+    ▲                         _______      
+    │                        /            
+    │                       /                     
+    │   ____               /                    
+    │  ╱    \             /                      
+    │        \___________/    
     └────┬────┬────────┬─────────► Days Operated
        Infant   Useful      Wear-out
-      (0-5 d)  (6-50 d)    (51-60 d)
-       12%      2.5%        12-20%
+      (0-5 d)  (6-49 d)    (50-60 d)
+       12%      2.5%        12-32%
 ```
 
 #### **Infant Zone (Days 0-5)**
@@ -30,17 +30,17 @@ Failure Rate
 - **Observation**: New machines need careful operation during break-in
 - **Strategy**: Light usage recommended; preventive maintenance is beneficial but primary focus should be setup quality
 
-#### **Useful Life Zone (Days 6-50)**
+#### **Useful Life Zone (Days 6-49)**
 - **Failure Rate**: 2.5% per day (baseline)
 - **Cause**: Normal wear and tear under expected conditions
 - **Observation**: Most productive phase; failures are rare but possible
 - **Strategy**: All maintenance strategies work well here; focus on normal operation
 
-#### **Wear-Out Zone (Days 51+)**
-- **Failure Rate**: 12% + (10 remaining days) × 0.02 per day
-  - Day 51: 12% base
-  - Day 55: 12% + 10×0.02 = 12.4%
-  - Day 60: 12% + 0×0.02 = 12% (end of rated lifetime)
+#### **Wear-Out Zone (Days 50+)**
+- **Failure Rate**: `12% + (10 - min(10, remaining_life_days)) × 2%` per day
+  - Day 50 (remaining=10): 12%
+  - Day 55 (remaining=5): 22%
+  - Day 60 (remaining=0): 32% (end of rated lifetime)
 - **Cause**: Accumulated fatigue, worn components, degraded systems
 - **Observation**: Exponential risk increase; critical window for decisions
 - **Strategy**: Urgent maintenance required; all failures become hard failures instantly
@@ -53,7 +53,7 @@ The system uses a **soft/hard failure escalation model** to create interesting g
 - Machine continues working but at **50% reduced capacity**
 - Reduces manual crafting output by half
 - Reduces automation worker effectiveness by half
-- Can escalate to hard failure on the next failure event
+- Shall escalate to hard failure on the next failure event
 - Signal: **yellow warning status** ("Soft failure")
 - Recovery: Any maintenance action (preventive or corrective) clears soft failure
 
@@ -66,8 +66,9 @@ The system uses a **soft/hard failure escalation model** to create interesting g
 - Recovery: Emergency repair (higher cost, more time) required
 
 #### **Escalation Rules by Zone**
-- **Infant Zone**: 30% chance soft → hard, 70% soft failure
-- **Useful Zone**: 18% chance soft → hard, 82% soft failure  
+- **If already in soft**, 100% failure becomes hard
+- **Infant Zone**: 30% chance failure becomes hard immediately
+- **Useful Zone**: 18% chance failure becomes hard immediately 
 - **Wear-Out Zone**: 100% failure becomes hard immediately (no soft failures possible)
 
 ### 3. Days Operated vs. Days Since Service
@@ -117,15 +118,19 @@ Operating normally → Soft failure → Repair when convenient
 - **Philosophy**: Service on a fixed schedule to prevent failures
 - **Interval Range**: 5, 10, 15 days (player configurable)
 - **Risk Modifiers**:
-  - **On-schedule**: 0.6× base failure rate (40% risk reduction)
+  - **On-schedule**: interval-dependent reduction (shorter interval = safer)
+    - 5-day interval: ~0.49× base risk
+    - 10-day interval: ~0.59× base risk
+    - 15-day interval: ~0.70× base risk
   - **Overdue** (days_since_service > interval): 1.4× base failure rate (40% risk increase)
 - **Best For**: High-value machines, stable operations, reliable production chains
 - **Tradeoff**: Regular maintenance cost but significantly lower failure risk when maintained
+- **Guardrail**: If maintenance is due, machine settings cannot be changed until service is performed (prevents strategy-switch exploit)
 
 **Flow:**
 ```
 Days 1-10 (on-schedule):
-  Operating at 0.6× risk (safer)
+  Operating at interval-based reduced risk (safer)
   
 Day 11 (overdue on 10-day interval):
   Risk jumps to 1.4× (less safe than base)
@@ -133,15 +138,15 @@ Day 11 (overdue on 10-day interval):
 ```
 
 **Example with 10-day Interval:**
-- Day 1-10: Service on day 10 (on-schedule) → 0.6× risk during entire period
-- Day 11: Haven't serviced yet → 1.4× risk
-- Day 20: Service on day 20 (2 days overdue) → risk was 1.4× for days 11-20
-- Day 21: Service on day 21 (1 day overdue) → risk was 1.4× for day 21 only
+- Day 1-10: Service planned on day 10 (on-schedule) → 0.6× risk during entire period
+- Day 12: Service on day 12 (2 days overdue) → risk was 1.4× for days 11-12
+- Day 13-22: Service planned on day 22 (on-schedule) → 0.6× risk during entire period
+- Day 23: Service on day 23 (1 day overdue) → risk was 1.4× for day 23 only
 
-#### **Predictive Maintenance** (Threshold-Based, Unlockable)
+#### [For future release] **Predictive Maintenance** (Threshold-Based, Unlockable)
 - **Status**: Future enhancement (unlock via "Predictive Maintenance Suite" blueprint)
 - **Philosophy**: Service based on health threshold rather than fixed schedule
-- **Mechanism**: Player sets wear threshold (e.g., 45% of lifetime)
+- **Mechanism**: The next failure date is known and so the player can service the day before
 - **Benefit**: Combines low risk of preventive with flexibility of corrective
 - **Trigger**: System automatically flags maintenance due when threshold crossed
 
@@ -159,7 +164,7 @@ Each machine has two service cost profiles:
 #### **Emergency Repair**
 - **Cost**: Higher (3× preventive cost)
 - **Time**: 4-7 hours (longer than preventive)
-- **Trigger**: Machine has soft or hard failure
+- **Trigger**: Machine has hard failure
 - **Effect**: Recovers machine to operational status immediately
 - **Best Used**: After failures occur, as damage control
 
@@ -181,8 +186,8 @@ Each machine has two service cost profiles:
 - **Preventive maintenance** becomes attractive for key machines
 - **Corrective maintenance** still viable for less critical machines
 
-### Late Game (Days 51+)
-- Machines enter wear-out zone with escalating failure risk (12-20%)
+### Late Game (Days 50+)
+- Machines enter wear-out zone with escalating failure risk (12-32%)
 - Failures become frequent and severe
 - **Urgent decision required**: Service immediately or risk catastrophic failure
 - Emergency repairs become very expensive
@@ -197,8 +202,8 @@ Is this a critical machine?
 └─ NO → Use corrective (pay only when broken)
          └─ Let it run until failure
 
-Has machine entered wear-out zone (day 51+)?
-├─ YES → Activate maintenance NOW (risk is 12-20%)
+Has machine entered wear-out zone (day 50+)?
+├─ YES → Activate maintenance NOW (risk is 12-32%)
 │        └─ Any pause risks failure spiral
 └─ NO → Can plan maintenance ahead
 
@@ -273,22 +278,31 @@ Maintenance overdue in preventive mode?
 
 ### Scenario 1: Emergency Cost Spiral
 ```
-Day 52: Machine enters wear-out (12% failure rate)
+Day 50: Machine enters wear-out (12% failure rate)
 Day 53: Soft failure occurs (50% output loss)
 Day 54: No repair → Hard failure (100% blocked)
 Day 54: Emergency repair costs $405 (3× $135)
-Day 55: Just recovered, but at 12% daily risk...
+Day 55: Just recovered, but at ~22% daily risk...
 ```
 **Lesson**: Service wear-out machines preemptively, not reactively.
 
 ### Scenario 2: Preventive Efficiency
 ```
 Day 10 (interval=10): Service day → days_since_service=0
-Day 11-20: Running at 0.6× risk (9% reduction in failure chance)
+Day 11-20: Running at ~0.59× risk
 Day 20: Service again (on-schedule) → resets to 0
-Days 21-30: Same 0.6× protection
+Days 21-30: Same ~0.59× protection
 ```
 **Lesson**: Preventive works best with consistency.
+
+### Scenario 4: Settings Lock When Due
+```
+Day 10: Preventive interval reached → maintenance_due = true
+Day 10: Attempt to switch strategy/interval → blocked
+Day 10: Service machine
+Day 10+: Settings can be changed again
+```
+**Lesson**: You must service due machines before changing maintenance settings.
 
 ### Scenario 3: Overdue Penalty
 ```
