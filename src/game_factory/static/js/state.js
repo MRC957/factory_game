@@ -91,6 +91,7 @@ const I18N = {
     machineStatus: "Status",
     machineStrategy: "Strategy",
     machineInterval: "Interval",
+    machinePredictiveTarget: "Target maintenance day",
     machineWear: "Wear",
     machineLife: "Life left",
     machineBuy: "Buy machine",
@@ -98,6 +99,7 @@ const I18N = {
     machineRepair: "Repair",
     machineCorrective: "Corrective",
     machinePreventive: "Preventive",
+    machinePredictive: "Predictive",
     machineDue: "Maintenance due",
     machineOwned: "Owned",
     machineMissing: "Missing",
@@ -107,6 +109,7 @@ const I18N = {
     hoursToAdvance: "Hours to advance",
     advanceTime: "⏭ Advance Time",
     restOfDay: "Rest of day",
+    nextMarketOpening: "To next market opening",
     save: "Save",
     load: "Load",
     saveSlot: "Slot",
@@ -175,6 +178,7 @@ const I18N = {
     machineStatus: "État",
     machineStrategy: "Stratégie",
     machineInterval: "Intervalle",
+    machinePredictiveTarget: "Jour cible de maintenance",
     machineWear: "Usure",
     machineLife: "Vie restante",
     machineBuy: "Acheter la machine",
@@ -182,6 +186,7 @@ const I18N = {
     machineRepair: "Réparer",
     machineCorrective: "Corrective",
     machinePreventive: "Préventive",
+    machinePredictive: "Prédictive",
     machineDue: "Maintenance due",
     machineOwned: "Possédée",
     machineMissing: "Absente",
@@ -191,6 +196,7 @@ const I18N = {
     hoursToAdvance: "Heures à avancer",
     advanceTime: "⏭ Avancer le temps",
     restOfDay: "Fin de journée",
+    nextMarketOpening: "Jusqu'à la prochaine ouverture du marché",
     save: "Sauvegarder",
     load: "Charger",
     saveSlot: "Slot",
@@ -265,6 +271,8 @@ function applyTranslations() {
   if (hoursInput) {
     const restOption = hoursInput.querySelector('option[value="rest"]');
     if (restOption) restOption.textContent = t("restOfDay");
+    const marketOpenOption = hoursInput.querySelector('option[value="market_open"]');
+    if (marketOpenOption) marketOpenOption.textContent = t("nextMarketOpening");
   }
   document.getElementById("btn-save-game").textContent = t("save");
   document.getElementById("btn-load-game").textContent = t("load");

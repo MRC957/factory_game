@@ -255,7 +255,9 @@ function machineStatusLabel(status) {
 }
 
 function machineStrategyLabel(strategy) {
-  return strategy === "preventive" ? t("machinePreventive") : t("machineCorrective");
+  if (strategy === "preventive") return t("machinePreventive");
+  if (strategy === "predictive") return t("machinePredictive");
+  return t("machineCorrective");
 }
 
 function renderMachines(s) {
@@ -282,6 +284,9 @@ function renderMachines(s) {
       .map(interval => `<option value="${interval}" ${selectedInterval === interval ? "selected" : ""}>${interval}d</option>`)
       .join("");
     const showInterval = machine.strategy === "preventive";
+    const predictiveTarget = machine.strategy === "predictive"
+      ? `<span>${t("machinePredictiveTarget")}: ${machine.predictive_maintenance_day ?? "-"}</span>`
+      : "";
 
     if (!machine.owned) {
       card.innerHTML = `
@@ -324,7 +329,8 @@ function renderMachines(s) {
         <span>${t("machineWear")}: ${machine.days_operated} / ${machine.rated_lifetime_days}d</span>
         <span>Days since service: ${machine.days_since_service}d</span>
         <span>${t("machineStrategy")}: ${machineStrategyLabel(machine.strategy)}</span>
-        <span>${t("machineInterval")}: ${machine.preventive_interval}d</span>
+        ${machine.strategy === "preventive" ? `<span>${t("machineInterval")}: ${machine.preventive_interval}d</span>` : ""}
+        ${predictiveTarget}
       </div>
       ${dueNote}
       <div class="machine-controls">

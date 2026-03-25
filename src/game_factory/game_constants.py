@@ -37,6 +37,7 @@ class MachineFailureZone(str, Enum):
 class MaintenanceStrategy(str, Enum):
     CORRECTIVE = "corrective"
     PREVENTIVE = "preventive"
+    PREDICTIVE = "predictive"
 
 
 @dataclass(frozen=True)
@@ -93,6 +94,9 @@ MACHINE_IDS: tuple[str, ...] = tuple(MACHINE_CATALOG.keys())
 MACHINE_STRATEGIES: tuple[str, ...] = tuple(strategy.value for strategy in MaintenanceStrategy)
 MACHINE_STATUSES: tuple[str, ...] = tuple(status.value for status in MachineStatus)
 DEFAULT_PREVENTIVE_INTERVAL = 10
+PREDICTIVE_MAINTENANCE_BLUEPRINT = "predictive_maintenance_suite"
+DEFAULT_PREDICTIVE_THRESHOLD = 0.10
+DEFAULT_PREDICTIVE_ALERT_WINDOW_DAYS = 3
 
 HOURS_PER_DAY = 24
 MARKET_OPEN_HOUR = 8

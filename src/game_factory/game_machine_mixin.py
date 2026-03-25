@@ -5,7 +5,6 @@ from typing import Any, Dict
 from game_factory.game_constants import (
     DEFAULT_PREVENTIVE_INTERVAL,
     MACHINE_CATALOG,
-    MACHINE_STRATEGIES,
     MachineSpec,
     MachineFailureZone,
     MachineStatus,
@@ -20,6 +19,9 @@ class _MachineContext:
     rng: Any
 
     def _consume_action_time(self, hours: int) -> str:
+        ...
+
+    def available_maintenance_strategies(self) -> tuple[str, ...]:
         ...
 
 
@@ -74,18 +76,35 @@ class MachineLifecycleMixin(_MachineContext):
         normalized = (interval - 3) / 17
         return 0.45 + normalized * 0.35
 
+    def _schedule_predictive_maintenance_day(self, recipe_name: str) -> int:
+        machine = self._machine_state(recipe_name)
+        current_day = int(machine["days_operated"])
+        remaining = self._machine_remaining_life(recipe_name)
+        if remaining <= 1:
+            return current_day
+        max_offset = min(15, max(1, remaining - 1))
+        min_offset = min(5, max_offset)
+        return current_day + self.rng.randint(min_offset, max_offset)
+
+    def _predictive_maintenance_due(self, recipe_name: str) -> bool:
+        machine = self._machine_state(recipe_name)
+        due_day = machine.get("predictive_maintenance_day")
+        if due_day is None:
+            return False
+        return int(machine["days_operated"]) >= int(due_day)
+
+    def _machine_base_failure_chance(self, recipe_name: str) -> float:
+        zone = self._machine_failure_zone(recipe_name)
+        if zone == MachineFailureZone.INFANT.value:
+            return 0.12
+        if zone == MachineFailureZone.WEAR_OUT.value:
+            remaining = max(0, self._machine_remaining_life(recipe_name))
+            return 0.12 + (10 - min(10, remaining)) * 0.02
+        return 0.025
+
     def _machine_failure_chance(self, recipe_name: str) -> float:
         machine = self._machine_state(recipe_name)
-        zone = self._machine_failure_zone(recipe_name)
-        # Base daily failure chance by reliability zone.
-        if zone == MachineFailureZone.INFANT.value:
-            chance = 0.12
-        elif zone == MachineFailureZone.WEAR_OUT.value:
-            remaining = max(0, self._machine_remaining_life(recipe_name))
-            # Wear-out risk increases as remaining life approaches 0.
-            chance = 0.12 + (10 - min(10, remaining)) * 0.02
-        else:
-            chance = 0.025
+        chance = self._machine_base_failure_chance(recipe_name)
 
         # Preventive strategy reduces risk while maintenance is on schedule,
         # but becomes riskier when running overdue.
@@ -94,6 +113,12 @@ class MachineLifecycleMixin(_MachineContext):
                 chance *= self._preventive_on_schedule_modifier(machine["preventive_interval"])
             else:
                 chance *= 1.4
+        elif machine["strategy"] == MaintenanceStrategy.PREDICTIVE.value:
+            due_day = machine.get("predictive_maintenance_day")
+            if due_day is None:
+                due_day = self._schedule_predictive_maintenance_day(recipe_name)
+                machine["predictive_maintenance_day"] = int(due_day)
+            chance *= 0.10 if int(machine["days_operated"]) <= int(due_day) else 10.0
         return min(0.95, chance)
 
     def _roll_machine_failure(self, recipe_name: str) -> str | None:
@@ -103,10 +128,8 @@ class MachineLifecycleMixin(_MachineContext):
             return None
 
         chance = self._machine_failure_chance(recipe_name)
-        # No failure today. If preventive maintenance is due, surface a reminder.
+        # No failure today.
         if self.rng.random() >= chance:
-            if machine["strategy"] == MaintenanceStrategy.PREVENTIVE.value and machine["maintenance_due"]:
-                return f"{spec.name} preventive maintenance is due."
             return None
 
         zone = self._machine_failure_zone(recipe_name)
@@ -134,6 +157,7 @@ class MachineLifecycleMixin(_MachineContext):
             if not machine["owned"]:
                 self._machines_used_today[recipe_name] = False
                 continue
+            previous_due = bool(machine["maintenance_due"])
             # Only machines that were actually used age for this day.
             if used:
                 machine["days_operated"] += 1
@@ -142,6 +166,17 @@ class MachineLifecycleMixin(_MachineContext):
                 machine["strategy"] == MaintenanceStrategy.PREVENTIVE.value
                 and machine["days_since_service"] >= machine["preventive_interval"]
             )
+            if machine["strategy"] == MaintenanceStrategy.PREDICTIVE.value:
+                if machine.get("predictive_maintenance_day") is None:
+                    machine["predictive_maintenance_day"] = self._schedule_predictive_maintenance_day(recipe_name)
+                machine["maintenance_due"] = self._predictive_maintenance_due(recipe_name)
+            if machine["maintenance_due"] and not previous_due:
+                spec = self._machine_spec(recipe_name)
+                if machine["strategy"] == MaintenanceStrategy.PREVENTIVE.value:
+                    lines.append(f"{spec.name} preventive maintenance is due.")
+                elif machine["strategy"] == MaintenanceStrategy.PREDICTIVE.value:
+                    due_day = int(machine.get("predictive_maintenance_day") or machine["days_operated"])
+                    lines.append(f"{spec.name} predictive alert: target maintenance day {due_day} reached. Failure risk will rise sharply if delayed.")
             # We roll failure checks on used machines once per day rollover.
             if used and machine["status"] != MachineStatus.HARD_FAILURE.value:
                 failure_line = self._roll_machine_failure(recipe_name)
@@ -167,6 +202,7 @@ class MachineLifecycleMixin(_MachineContext):
             "status": MachineStatus.OPERATIONAL.value,
             "strategy": MaintenanceStrategy.CORRECTIVE.value,
             "preventive_interval": DEFAULT_PREVENTIVE_INTERVAL,
+            "predictive_maintenance_day": None,
             "days_operated": 0,
             "days_since_service": 0,
             "maintenance_due": False,
@@ -177,7 +213,7 @@ class MachineLifecycleMixin(_MachineContext):
         spec = MACHINE_CATALOG.get(recipe_name)
         if not spec:
             return f"Unknown machine recipe '{recipe_name}'."
-        if strategy not in MACHINE_STRATEGIES:
+        if strategy not in self.available_maintenance_strategies():
             return f"Unknown maintenance strategy '{strategy}'."
 
         machine = self._machine_state(recipe_name)
@@ -187,6 +223,8 @@ class MachineLifecycleMixin(_MachineContext):
         is_due_now = bool(machine["maintenance_due"])
         if machine["strategy"] == MaintenanceStrategy.PREVENTIVE.value:
             is_due_now = is_due_now or machine["days_since_service"] >= machine["preventive_interval"]
+        if machine["strategy"] == MaintenanceStrategy.PREDICTIVE.value:
+            is_due_now = is_due_now or self._predictive_maintenance_due(recipe_name)
         if is_due_now and (strategy != machine["strategy"] or preventive_interval is not None):
             return f"{spec.name} maintenance is due. Service the machine before changing settings."
 
@@ -195,10 +233,17 @@ class MachineLifecycleMixin(_MachineContext):
             if preventive_interval < 3 or preventive_interval > 20:
                 return "Preventive interval must be between 3 and 20 operating days."
             machine["preventive_interval"] = preventive_interval
+        if strategy == MaintenanceStrategy.PREDICTIVE.value:
+            current_day = int(machine["days_operated"])
+            due_day = machine.get("predictive_maintenance_day")
+            if due_day is None or int(due_day) <= current_day:
+                machine["predictive_maintenance_day"] = self._schedule_predictive_maintenance_day(recipe_name)
         machine["maintenance_due"] = (
             strategy == MaintenanceStrategy.PREVENTIVE.value
             and machine["days_since_service"] >= machine["preventive_interval"]
         )
+        if strategy == MaintenanceStrategy.PREDICTIVE.value:
+            machine["maintenance_due"] = self._predictive_maintenance_due(recipe_name)
         return (
             f"Updated {spec.name}: strategy={machine['strategy']}, "
             f"interval={machine['preventive_interval']} day(s)."
@@ -221,6 +266,8 @@ class MachineLifecycleMixin(_MachineContext):
             self.cash -= cost
             machine["status"] = MachineStatus.OPERATIONAL.value
             machine["days_since_service"] = 0
+            if machine["strategy"] == MaintenanceStrategy.PREDICTIVE.value:
+                machine["predictive_maintenance_day"] = self._schedule_predictive_maintenance_day(recipe_name)
             machine["maintenance_due"] = False
             self._machines_used_today[recipe_name] = False
             return f"Repaired {spec.name} for ${cost:.2f}.\n{self._consume_action_time(hours)}"
@@ -233,6 +280,8 @@ class MachineLifecycleMixin(_MachineContext):
         self.cash -= cost
         machine["status"] = MachineStatus.OPERATIONAL.value
         machine["days_since_service"] = 0
+        if machine["strategy"] == MaintenanceStrategy.PREDICTIVE.value:
+            machine["predictive_maintenance_day"] = self._schedule_predictive_maintenance_day(recipe_name)
         machine["maintenance_due"] = False
         self._machines_used_today[recipe_name] = False
         return f"Performed preventive maintenance on {spec.name} for ${cost:.2f}.\n{self._consume_action_time(hours)}"

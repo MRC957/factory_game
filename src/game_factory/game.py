@@ -11,9 +11,9 @@ from .game_constants import (
     ITEM_CATALOG,
     MACHINE_CATALOG,
     MACHINE_STATUSES,
-    MACHINE_STRATEGIES,
     MARKET_CLOSE_HOUR,
     MARKET_OPEN_HOUR,
+    PREDICTIVE_MAINTENANCE_BLUEPRINT,
     Blueprint,
     MachineStatus,
     MaintenanceStrategy,
@@ -63,9 +63,11 @@ class FactoryGame(MachineLifecycleMixin, GameplayActionsMixin):
                 "status": MachineStatus.MISSING.value,
                 "strategy": MaintenanceStrategy.CORRECTIVE.value,
                 "preventive_interval": DEFAULT_PREVENTIVE_INTERVAL,
+                "predictive_maintenance_day": None,
                 "days_operated": 0,
                 "days_since_service": 0,
                 "maintenance_due": False,
+                "maintenance_due_notified": False,
             }
             for recipe_name in MACHINE_CATALOG
         }
@@ -82,6 +84,11 @@ class FactoryGame(MachineLifecycleMixin, GameplayActionsMixin):
             ),
             "assembly_jigs": Blueprint(
                 "assembly_jigs", 1000.0, "Widget recipe consumes 1 less ingot (min 0)."
+            ),
+            PREDICTIVE_MAINTENANCE_BLUEPRINT: Blueprint(
+                PREDICTIVE_MAINTENANCE_BLUEPRINT,
+                1250.0,
+                "Unlock predictive maintenance strategy with remaining-life based servicing.",
             ),
         }
         self.owned_blueprints: set[str] = set()
@@ -143,6 +150,11 @@ class FactoryGame(MachineLifecycleMixin, GameplayActionsMixin):
             g.price_history = []
             g._record_price_history()
 
+        saved_blueprints = payload.get("owned_blueprints", [])
+        if isinstance(saved_blueprints, list):
+            g.owned_blueprints = {
+                bp for bp in saved_blueprints if bp in g.blueprints}
+
         saved_machines = payload.get("machines", {})
         if isinstance(saved_machines, dict):
             for recipe_name, machine in g.machines.items():
@@ -157,29 +169,30 @@ class FactoryGame(MachineLifecycleMixin, GameplayActionsMixin):
                     machine["status"] = MachineStatus.OPERATIONAL.value if machine["owned"] else MachineStatus.MISSING.value
                 machine["strategy"] = str(raw_machine.get(
                     "strategy", machine["strategy"]))
-                if machine["strategy"] not in MACHINE_STRATEGIES:
+                if machine["strategy"] not in g.available_maintenance_strategies():
                     machine["strategy"] = MaintenanceStrategy.CORRECTIVE.value
                 machine["preventive_interval"] = max(
                     3,
                     int(raw_machine.get("preventive_interval",
                         machine["preventive_interval"])),
                 )
+                raw_predictive_day = raw_machine.get("predictive_maintenance_day", machine["predictive_maintenance_day"])
+                machine["predictive_maintenance_day"] = None if raw_predictive_day is None else int(raw_predictive_day)
                 machine["days_operated"] = max(
                     0, int(raw_machine.get("days_operated", machine["days_operated"])))
                 machine["days_since_service"] = max(0, int(raw_machine.get(
                     "days_since_service", machine["days_since_service"])))
                 machine["maintenance_due"] = bool(raw_machine.get(
                     "maintenance_due", machine["maintenance_due"]))
+                machine["maintenance_due_notified"] = bool(raw_machine.get(
+                    "maintenance_due_notified", machine["maintenance_due_notified"]))
                 if not machine["owned"]:
                     machine["status"] = MachineStatus.MISSING.value
                     machine["days_operated"] = 0
                     machine["days_since_service"] = 0
+                    machine["predictive_maintenance_day"] = None
                     machine["maintenance_due"] = False
-
-        saved_blueprints = payload.get("owned_blueprints", [])
-        if isinstance(saved_blueprints, list):
-            g.owned_blueprints = {
-                bp for bp in saved_blueprints if bp in g.blueprints}
+                    machine["maintenance_due_notified"] = False
 
         rng_state = payload.get("rng_state")
         if isinstance(rng_state, str):
@@ -189,6 +202,12 @@ class FactoryGame(MachineLifecycleMixin, GameplayActionsMixin):
                 pass
 
         return g
+
+    def available_maintenance_strategies(self) -> tuple[str, ...]:
+        strategies = [MaintenanceStrategy.CORRECTIVE.value, MaintenanceStrategy.PREVENTIVE.value]
+        if PREDICTIVE_MAINTENANCE_BLUEPRINT in self.owned_blueprints:
+            strategies.append(MaintenanceStrategy.PREDICTIVE.value)
+        return tuple(strategies)
 
     def _record_price_history(self) -> None:
         snapshot: dict[str, float | int] = {"day": self.day}

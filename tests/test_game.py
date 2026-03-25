@@ -352,10 +352,10 @@ class TestBuyBlueprint:
 
     def test_buy_all_blueprints(self):
         g = _game_with_cash(5000.0)
-        for name in ["smelter_optimization", "precision_molds", "assembly_jigs"]:
+        for name in g.blueprints:
             msg = g.buy_blueprint(name)
             assert "Bought" in msg
-        assert len(g.owned_blueprints) == 3
+        assert len(g.owned_blueprints) == len(g.blueprints)
 
 
 # ── recipe_effective() ───────────────────────────────────────────────────────

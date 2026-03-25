@@ -25,7 +25,6 @@ from game_factory.game_constants  import (
     MARKET_CLOSE_HOUR,
     MARKET_OPEN_HOUR,
     MACHINE_CATALOG,
-    MACHINE_STRATEGIES,
     RECIPE_IDS,
 )
 
@@ -135,7 +134,7 @@ def _game_state(compact: bool = False) -> dict[str, Any]:
         # price_change is stored as a fraction in the model; convert to % for display.
         "price_change": {k: round(v * 100, 1) for k, v in g.price_change.items()},
         "assignments": dict(g.assignments),
-        "maintenance_strategies": list(MACHINE_STRATEGIES),
+        "maintenance_strategies": list(g.available_maintenance_strategies()),
         "machines": {
             recipe_name: {
                 **dict(g.machines[recipe_name]),

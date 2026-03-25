@@ -123,6 +123,7 @@ export const MOCK_STATE = {
     smelter_optimization: { cost: 450.0, description: 'Ingot recipe consumes 1 less ore (min 1).', owned: false },
     precision_molds:      { cost: 700.0, description: 'Gear recipe produces +1 gear per batch.',   owned: false },
     assembly_jigs:        { cost: 1000.0, description: 'Widget recipe consumes 1 less ingot (min 0).', owned: false },
+    predictive_maintenance_suite: { cost: 1250.0, description: 'Unlock predictive maintenance strategy with remaining-life based servicing.', owned: false },
   },
   effective_recipes: {
     ingot:    { inputs: { ore: 2 },                outputs: { ingot: 1 } },

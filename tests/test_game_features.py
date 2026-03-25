@@ -232,3 +232,60 @@ def test_shorter_preventive_interval_gives_stronger_risk_reduction() -> None:
     long_interval_chance = game._machine_failure_chance("gear")
 
     assert short_interval_chance < long_interval_chance
+
+
+def test_predictive_strategy_is_unlocked_by_blueprint() -> None:
+    game = FactoryGame(seed=5)
+    game.cash = 5000.0
+
+    assert "predictive" not in game.available_maintenance_strategies()
+
+    game.buy_blueprint("predictive_maintenance_suite")
+
+    assert "predictive" in game.available_maintenance_strategies()
+
+
+def test_predictive_due_uses_remaining_life_threshold() -> None:
+    game = FactoryGame(seed=5)
+    game.cash = 5000.0
+    game.buy_blueprint("predictive_maintenance_suite")
+    game.buy_machine("ingot")
+    game.update_machine_settings("ingot", "predictive")
+    game.machines["ingot"]["predictive_maintenance_day"] = 50
+    game.machines["ingot"]["days_operated"] = 50
+
+    game._update_machines_for_day_rollover()
+
+    assert game.machines["ingot"]["maintenance_due"] is True
+
+
+def test_predictive_alert_is_emitted_when_target_day_reached() -> None:
+    game = FactoryGame(seed=5)
+    game.cash = 5000.0
+    game.buy_blueprint("predictive_maintenance_suite")
+    game.buy_machine("ingot")
+    game.update_machine_settings("ingot", "predictive")
+    game.machines["ingot"]["predictive_maintenance_day"] = 54
+    game.machines["ingot"]["days_operated"] = 53
+    game._machines_used_today["ingot"] = True
+
+    lines = game._update_machines_for_day_rollover()
+
+    assert any("predictive alert" in line.lower() for line in lines)
+
+
+def test_predictive_risk_is_low_before_day_and_high_after_day() -> None:
+    game = FactoryGame(seed=5)
+    game.cash = 5000.0
+    game.buy_blueprint("predictive_maintenance_suite")
+    game.buy_machine("ingot")
+    game.update_machine_settings("ingot", "predictive")
+    game.machines["ingot"]["predictive_maintenance_day"] = 20
+
+    game.machines["ingot"]["days_operated"] = 19
+    before_chance = game._machine_failure_chance("ingot")
+
+    game.machines["ingot"]["days_operated"] = 21
+    after_chance = game._machine_failure_chance("ingot")
+
+    assert after_chance > before_chance

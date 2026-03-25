@@ -321,10 +321,10 @@ describe('renderFactory()', () => {
 // ── renderBlueprints ──────────────────────────────────────────────────────────
 
 describe('renderBlueprints()', () => {
-  it('creates one card per blueprint (3 blueprints)', () => {
+  it('creates one card per blueprint (4 blueprints)', () => {
     window.renderBlueprints(MOCK_STATE)
     const cards = document.querySelectorAll('#blueprints-grid .bp-card')
-    expect(cards.length).toBe(3)
+    expect(cards.length).toBe(4)
   })
 
   it('shows cost for each blueprint', () => {

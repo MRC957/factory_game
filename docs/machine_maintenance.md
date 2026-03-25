@@ -143,12 +143,15 @@ Day 11 (overdue on 10-day interval):
 - Day 13-22: Service planned on day 22 (on-schedule) → 0.6× risk during entire period
 - Day 23: Service on day 23 (1 day overdue) → risk was 1.4× for day 23 only
 
-#### [For future release] **Predictive Maintenance** (Threshold-Based, Unlockable)
-- **Status**: Future enhancement (unlock via "Predictive Maintenance Suite" blueprint)
-- **Philosophy**: Service based on health threshold rather than fixed schedule
-- **Mechanism**: The next failure date is known and so the player can service the day before
-- **Benefit**: Combines low risk of preventive with flexibility of corrective
-- **Trigger**: System automatically flags maintenance due when threshold crossed
+#### **Predictive Maintenance** (Threshold-Based, Unlockable)
+- **Status**: Implemented (unlock via "Predictive Maintenance Suite" blueprint)
+- **Philosophy**: Service based on a known random target day instead of fixed interval
+- **Mechanism**: At each service, the game rolls and reveals a new target maintenance day (in operating-day units)
+- **Risk Behavior**:
+  - **Before/at target day**: very low risk (`×0.1`)
+  - **After target day**: very high risk (`×10`)
+- **Benefit**: Feels anticipative and realistic ("fail soon" signal) while keeping gameplay readable
+- **Trigger**: Predictive alert appears when the target day is reached
 
 ### 5. Service Costs
 

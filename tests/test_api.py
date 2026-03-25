@@ -321,6 +321,19 @@ class TestApiMachines:
         assert payload["message"].startswith("Gear Press maintenance is due")
         assert payload["state"]["machines"]["gear"]["strategy"] == "preventive"
 
+    def test_predictive_strategy_not_available_before_unlock(self, client):
+        payload = client.get("/api/state").get_json()
+
+        assert "predictive" not in payload["maintenance_strategies"]
+
+    def test_predictive_strategy_available_after_unlock(self, client):
+        web_gui._game.cash = 5000.0
+        client.post("/api/buy_blueprint", json={"name": "predictive_maintenance_suite"})
+
+        payload = client.get("/api/state").get_json()
+
+        assert "predictive" in payload["maintenance_strategies"]
+
 
 # ── /api/fire ────────────────────────────────────────────────────────────────
 
