@@ -7,8 +7,10 @@ function render(state) {
   renderMarket(G);
   renderInventory(G, "inventory-sidebar-grid");
   renderFactory(G);
+  renderContracts(G);
   renderBlueprints(G);
   renderMargins(G);
+  renderContractHistory(G);
   renderPriceChart(G);
   updateCostPreview();
   updateRecipeInfo();
@@ -31,8 +33,10 @@ function renderAction(statePatch, sections = {}) {
   if (sections.market) renderMarket(G);
   if (sections.inventory) renderInventory(G, "inventory-sidebar-grid");
   if (sections.factory) renderFactory(G);
+  if (sections.contracts) renderContracts(G);
   if (sections.blueprints) renderBlueprints(G);
   if (sections.margins) renderMargins(G);
+  if (sections.contracts || sections.margins) renderContractHistory(G);
   if (sections.chart) renderPriceChart(G);
   if (sections.costPreview) updateCostPreview();
   if (sections.recipeInfo) updateRecipeInfo();
@@ -90,6 +94,26 @@ function renderMarket(s) {
   if (marketQtyInput) marketQtyInput.disabled = !isOpen;
 }
 
+// ── Warehouse overflow warning tracker ─────────────────────────────
+// Tracks which sources currently have a warehouse overflow risk.
+// Sources: "automation" | "craft" | "buy"
+const warehouseOverflowSources = new Set();
+
+function setWarehouseOverflow(source, hasOverflow) {
+  if (hasOverflow) warehouseOverflowSources.add(source);
+  else warehouseOverflowSources.delete(source);
+  const el = document.getElementById("warehouse-info");
+  if (!el) return;
+  if (warehouseOverflowSources.size > 0) {
+    el.classList.add("warehouse-overflow-warn");
+    const sources = Array.from(warehouseOverflowSources).join(", ");
+    el.dataset.overflowSources = sources;
+  } else {
+    el.classList.remove("warehouse-overflow-warn");
+    delete el.dataset.overflowSources;
+  }
+}
+
 function renderInventory(s, targetId = "inventory-sidebar-grid") {
   const grid = document.getElementById(targetId);
   if (!grid) return;
@@ -102,6 +126,30 @@ function renderInventory(s, targetId = "inventory-sidebar-grid") {
       <div class="inv-qty" style="color:${qty > 0 ? "var(--text)" : "var(--muted)"}">${qty}</div>`;
     grid.appendChild(div);
   });
+  renderWarehouse(s);
+}
+
+function renderWarehouse(s) {
+  // Track automation overflow first so the warehouse panel reflects latest sources.
+  const automationOverflow = s.automation_preview?.overflowed ?? {};
+  setWarehouseOverflow("automation", Object.keys(automationOverflow).length > 0);
+
+  const warehouseInfo = document.getElementById("warehouse-info");
+  if (warehouseInfo && s.warehouse) {
+    const usageClass = (s.warehouse.used ?? 0) >= (s.warehouse.capacity ?? 0) ? "risky" : "";
+    const overflowSources = Array.from(warehouseOverflowSources);
+    const sourceNote = overflowSources.length > 0
+      ? `<br><span style="color:var(--gold);font-size:0.8em">⚠ overflow risk: ${overflowSources.join(", ")}</span>`
+      : "";
+    warehouseInfo.innerHTML =
+      `<strong>Warehouse:</strong> L${s.warehouse.level} ` +
+      `<br><span class="${usageClass}">${s.warehouse.used}/${s.warehouse.capacity} used</span>${sourceNote}`;
+  }
+
+  const upgradeButton = document.getElementById("btn-upgrade-warehouse");
+  if (upgradeButton && s.warehouse) {
+    upgradeButton.textContent = `Upgrade Warehouse (${fmt(s.warehouse.upgrade_cost ?? 0)})`;
+  }
 }
 
 function renderPriceChart(s) {
@@ -221,7 +269,6 @@ function renderFactory(s) {
         <input type="text" id="assign-${recipe}" value="${current}" inputmode="numeric" oninput="onAssignmentQtyInput('${recipe}')" aria-label="Assignment quantity for ${recipe}">
         <button class="qty-stepper-btn" type="button" onclick="adjustAssignmentQty('${recipe}', 1)" aria-label="Increase quantity">+</button>
       </div>
-      <button class="btn-primary" onclick="doAssign('${recipe}')" style="padding:6px 12px;">Set</button>
       <span class="assign-workers">${current > 0 ? `${current} ${t("active")}` : t("idle")}</span>`;
     list.appendChild(row);
   });
@@ -229,9 +276,19 @@ function renderFactory(s) {
   const previewEl = document.getElementById("automation-preview");
   if (previewEl) {
     const produced = s.automation_preview?.produced || {};
+    const wasteGenerated = s.automation_preview?.waste_generated || {};
+    const overflowed = s.automation_preview?.overflowed || {};
     const orderedProducedItems = allItems(s).filter(item => (produced[item] ?? 0) > 0);
+    const orderedWasteItems = allItems(s).filter(item => (wasteGenerated[item] ?? 0) > 0);
+    const overflowedItems = allItems(s).filter(item => (overflowed[item] ?? 0) > 0);
     const producedText = orderedProducedItems
       .map(item => `${produced[item]}× ${itemIcon(item)}<span class="item-name">${item}</span>`)
+      .join(", ");
+    const wasteText = orderedWasteItems
+      .map(item => `${wasteGenerated[item]}× ${itemIcon(item)}<span class="item-name">${item}</span>`)
+      .join(", ");
+    const overflowText = overflowedItems
+      .map(item => `${overflowed[item]}× ${itemIcon(item)}<span class="item-name">${item}</span>`)
       .join(", ");
 
     if (!producedText) {
@@ -239,9 +296,199 @@ function renderFactory(s) {
     } else {
       previewEl.innerHTML = `<strong>${t("automationPreviewTitle")}:</strong> ${producedText}`;
     }
+    if (wasteText) {
+      previewEl.innerHTML += `<br><strong>Waste:</strong> ${wasteText}`;
+    }
+    if (overflowText) {
+      previewEl.innerHTML += `<br><strong class="risky">Warning:</strong> <span class="risky">Warehouse overflow will discard ${overflowText}.</span>`;
+    }
   }
 
   renderMachines(s);
+}
+
+function simulateOverflow(inventory, capacity) {
+  const adjusted = { ...inventory };
+  const overflowed = {};
+  let used = Object.values(adjusted).reduce((sum, qty) => sum + Math.max(0, qty ?? 0), 0);
+  if (used <= capacity) {
+    return { adjusted, overflowed };
+  }
+
+  let overflow = used - capacity;
+  Object.keys(adjusted)
+    .sort((left, right) => (adjusted[right] ?? 0) - (adjusted[left] ?? 0))
+    .forEach(item => {
+      if (overflow <= 0) return;
+      const available = Math.max(0, adjusted[item] ?? 0);
+      if (available <= 0) return;
+      const cut = Math.min(available, overflow);
+      adjusted[item] -= cut;
+      overflow -= cut;
+      overflowed[item] = (overflowed[item] ?? 0) + cut;
+    });
+
+  return { adjusted, overflowed };
+}
+
+function computeManualCraftPreview(s, recipeName, requestedQty) {
+  const recipe = s.effective_recipes?.[recipeName];
+  const machine = s.machines?.[recipeName];
+  if (!recipe || !machine) return null;
+
+  if (!machine.owned || machine.status === "hard_failure") {
+    return {
+      craftable: 0,
+      produced: {},
+      wasteGenerated: {},
+      overflowed: {},
+      limitedBy: "machine",
+    };
+  }
+
+  let craftable = Math.max(0, requestedQty);
+  if (machine.status === "soft_failure") {
+    craftable = Math.max(1, Math.floor((craftable + 1) / 2));
+  }
+
+  Object.entries(recipe.inputs || {}).forEach(([item, qty]) => {
+    if (qty > 0) {
+      craftable = Math.min(craftable, Math.floor((s.inventory?.[item] ?? 0) / qty));
+    }
+  });
+
+  const nextInventory = { ...(s.inventory || {}) };
+  Object.entries(recipe.inputs || {}).forEach(([item, qty]) => {
+    nextInventory[item] = (nextInventory[item] ?? 0) - (qty * craftable);
+  });
+
+  const produced = {};
+  Object.entries(recipe.outputs || {}).forEach(([item, qty]) => {
+    produced[item] = qty * craftable;
+    nextInventory[item] = (nextInventory[item] ?? 0) + produced[item];
+  });
+
+  const wasteGenerated = {};
+  if (["gear", "widget"].includes(recipeName) && craftable > 0) {
+    const scrap = Math.floor(craftable / 2);
+    if (scrap > 0) {
+      wasteGenerated.scrap = scrap;
+      nextInventory.scrap = (nextInventory.scrap ?? 0) + scrap;
+    }
+  }
+
+  const { overflowed } = simulateOverflow(nextInventory, s.warehouse?.capacity ?? Number.MAX_SAFE_INTEGER);
+  return { craftable, produced, wasteGenerated, overflowed };
+}
+
+function contractDaysLeft(contract, currentDay) {
+  return Math.max(0, Number(contract.deadline_day ?? currentDay) - Number(currentDay ?? 0));
+}
+
+function contractCanClaim(contract, inventory) {
+  if (!contract || !["accepted", "completed"].includes(contract.status)) return false;
+  return (inventory?.[contract.item] ?? 0) >= (contract.qty ?? 0);
+}
+
+function groupContracts(contracts) {
+  const grouped = new Map();
+  (Array.isArray(contracts) ? contracts : []).forEach(contract => {
+    const key = contract.group_key ?? contract.name ?? contract.id;
+    if (!grouped.has(key)) {
+      grouped.set(key, { title: contract.name, entries: [] });
+    }
+    grouped.get(key).entries.push(contract);
+  });
+  return Array.from(grouped.values());
+}
+
+function renderContracts(s) {
+  const summary = document.getElementById("contracts-summary");
+  const contractsList = document.getElementById("contracts-list");
+  if (!contractsList) return;
+
+  const contracts = Array.isArray(s.contracts) ? s.contracts : [];
+  const openCount = contracts.filter(contract => contract.status === "open").length;
+  const activeCount = contracts.filter(contract => contract.status !== "open").length;
+  if (summary) {
+    summary.innerHTML = `Open offers: <strong>${openCount}</strong><br>Accepted or ready: <strong>${activeCount}</strong>`;
+  }
+
+  contractsList.innerHTML = "";
+  if (contracts.length === 0) {
+    contractsList.innerHTML = `<div class="machine-note">No contracts available.</div>`;
+    return;
+  }
+
+  groupContracts(contracts).forEach(group => {
+    const wrapper = document.createElement("section");
+    wrapper.className = "contract-group";
+    wrapper.innerHTML = `<div class="contract-group-title">${group.title}</div>`;
+
+    group.entries.forEach(contract => {
+      const card = document.createElement("div");
+      const status = contract.status || "open";
+      const daysLeft = contractDaysLeft(contract, s.day);
+      const dueSoon = daysLeft <= 1;
+      const canClaim = contractCanClaim(contract, s.inventory);
+      const actionBtn = status === "open"
+        ? `<button class="btn-primary" onclick="doAcceptContract('${contract.id}')">Accept</button>`
+        : canClaim
+          ? `<button class="btn-craft" onclick="doClaimContract('${contract.id}')">Claim ${fmt(contract.reward ?? 0)}</button>`
+          : `<button class="btn-primary" disabled>${status}</button>`;
+      card.className = `machine-card machine-owned contract-card${dueSoon ? " contract-due-soon" : ""}`;
+      card.innerHTML = `
+        <div class="machine-head">
+          <div>
+            <div class="machine-name">${contract.difficulty} • ${contract.qty}× ${itemIcon(contract.item)}<span class="item-name">${contract.item}</span></div>
+            <div class="machine-recipe"><span class="loss">Penalty ${fmt(contract.penalty ?? 0)}</span> • <span class="profit">Reward ${fmt(contract.reward ?? 0)}</span></div>
+          </div>
+          <div class="machine-status ${dueSoon ? "hard_failure" : status === "completed" ? "operational" : "soft_failure"}">${status}</div>
+        </div>
+        <div class="machine-stats">
+          <span>Deadline: day ${contract.deadline_day}</span>
+          <span class="${dueSoon ? "loss" : ""}">Due in ${daysLeft} day(s)</span>
+        </div>
+        ${actionBtn}
+      `;
+      wrapper.appendChild(card);
+    });
+
+    contractsList.appendChild(wrapper);
+  });
+}
+
+function renderContractHistory(s) {
+  const historyList = document.getElementById("contract-history-list");
+  if (!historyList) return;
+
+  const history = Array.isArray(s.contract_history) ? s.contract_history : [];
+  historyList.innerHTML = "";
+  if (history.length === 0) {
+    historyList.innerHTML = `<div class="machine-note">No contract history yet.</div>`;
+    return;
+  }
+
+  groupContracts(history).forEach(group => {
+    const wrapper = document.createElement("section");
+    wrapper.className = "contract-group";
+    wrapper.innerHTML = `<div class="contract-group-title">${group.title}</div>`;
+
+    group.entries.forEach(contract => {
+      const row = document.createElement("div");
+      row.className = "contract-history-row";
+      row.innerHTML = `
+        <span>${contract.difficulty}</span>
+        <span>${contract.qty}× ${contract.item}</span>
+        <span>${fmt(contract.reward ?? 0)}</span>
+        <span class="${contract.status === "claimed" ? "profit" : contract.status === "failed" ? "loss" : "risky"}">${contract.status}</span>
+        <span>Day ${contract.resolved_day ?? "-"}</span>
+      `;
+      wrapper.appendChild(row);
+    });
+
+    historyList.appendChild(wrapper);
+  });
 }
 
 function machineStatusLabel(status) {
@@ -400,6 +647,12 @@ function updateCostPreview() {
   const qty = parseMarketQty(document.getElementById("market-qty").value, 0);
   const price = G.market_prices[item] ?? 0;
   document.getElementById("cost-preview").textContent = fmt(price * qty);
+
+  // Check if buying this qty would overflow the warehouse
+  const nextInventory = { ...(G.inventory || {}), [item]: (G.inventory?.[item] ?? 0) + qty };
+  const { overflowed } = simulateOverflow(nextInventory, G.warehouse?.capacity ?? Number.MAX_SAFE_INTEGER);
+  setWarehouseOverflow("buy", Object.keys(overflowed).length > 0);
+
   if (priceHistoryVisible) {
     renderPriceChart(G);
   }
@@ -408,9 +661,22 @@ function updateCostPreview() {
 function updateRecipeInfo() {
   if (!G) return;
   const recipe = document.getElementById("craft-recipe").value;
+  const craftInput = document.getElementById("craft-qty");
+  const requestedQty = parseCraftQty(craftInput?.value ?? "0", 0);
   const er = G.effective_recipes[recipe];
   if (!er) return;
   const machine = G.machines?.[recipe];
+  const hoursPerBatch = G.craft_hours?.[recipe] ?? 1;
+  const preview = computeManualCraftPreview(G, recipe, requestedQty);
+  const craftMax = computeCraftMax();
+  if (craftInput) {
+    craftInput.max = String(craftMax);
+    if (requestedQty > craftMax) {
+      craftInput.value = String(craftMax);
+    }
+  }
+
+  // ── Recipe section ─────────────────────────────────────────────
   const inputs = Object.entries(er.inputs)
     .map(([k, v]) => {
       const available = G.inventory?.[k] ?? 0;
@@ -421,13 +687,62 @@ function updateRecipeInfo() {
   const outputs = Object.entries(er.outputs)
     .map(([k, v]) => `${v}× ${itemIcon(k)}<span class="item-name">${k}</span>`)
     .join(", ");
+
+  let html = `<strong>${t("inputs")}:</strong> ${inputs}`;
+  html += `<br><strong>${t("outputs")}:</strong> ${outputs}`;
+  html += `<br><span style="color:var(--muted);font-size:0.85em">⏱ ${hoursPerBatch}h per batch</span>`;
+
+  // ── Machine section ────────────────────────────────────────────
   const machineMissing = Boolean(machine && !machine.owned);
   const machineFailed = Boolean(machine && machine.owned && (machine.status === "soft_failure" || machine.status === "hard_failure"));
-  const machineText = machine
-    ? `<br><strong>${t("machineRequired")}:</strong> <span class="${machineMissing || machineFailed ? "loss" : ""}">${machine.name} (${machineStatusLabel(machine.owned ? machine.status : "missing")})</span>`
-    : "";
-  document.getElementById("recipe-info").innerHTML =
-    `<strong>${t("inputs")}:</strong> ${inputs}<br><strong>${t("outputs")}:</strong> ${outputs}${machineText}`;
+  if (machine) {
+    html += `<hr class="recipe-sep">`;
+    html += `<strong>${t("machineRequired")}:</strong> <span class="${machineMissing || machineFailed ? "loss" : ""}">${machine.name} (${machineStatusLabel(machine.owned ? machine.status : "missing")})</span>`;
+  }
+
+  // ── Expected output section ────────────────────────────────────
+  if (requestedQty > 0 && preview) {
+    html += `<hr class="recipe-sep">`;
+    const craftable = preview.craftable ?? 0;
+    const totalHours = craftable * hoursPerBatch;
+    const currentHour = G.hour ?? 0;
+    const endHour = currentHour + totalHours;
+    const daysElapsed = Math.floor(endHour / 24);
+    const endLocalHour = endHour % 24;
+    const endDay = (G.day ?? 1) + daysElapsed;
+    const stoppingTime = `${String(endLocalHour).padStart(2, "0")}:00`;
+    const dayNote = daysElapsed > 0 ? ` (Day ${endDay})` : "";
+
+    const previewOutputs = Object.entries(preview.produced || {})
+      .filter(([, qty]) => qty > 0)
+      .map(([item, qty]) => `${qty}× ${itemIcon(item)}<span class="item-name">${item}</span>`)
+      .join(", ");
+    const previewWaste = Object.entries(preview.wasteGenerated || {})
+      .filter(([, qty]) => qty > 0)
+      .map(([item, qty]) => `${qty}× ${itemIcon(item)}<span class="item-name">${item}</span>`)
+      .join(", ");
+    const previewOverflow = Object.entries(preview.overflowed || {})
+      .filter(([, qty]) => qty > 0)
+      .map(([item, qty]) => `${qty}× ${itemIcon(item)}<span class="item-name">${item}</span>`)
+      .join(", ");
+
+    html += `<strong>Expected for ${craftable} batch(es):</strong>`;
+    if (craftable > 0) {
+      html += `<br>⏱ Time: ${totalHours}h (${craftable} × ${hoursPerBatch}h)`;
+      html += `<br>🏁 Done at ${stoppingTime}${dayNote}`;
+    }
+    if (previewOutputs) html += `<br><strong>Output:</strong> ${previewOutputs}`;
+    if (previewWaste)   html += `<br><strong>Waste:</strong> ${previewWaste}`;
+    if (previewOverflow) {
+      html += `<br><strong class="risky">⚠ Overflow:</strong> <span class="risky">Warehouse will discard ${previewOverflow}.</span>`;
+    }
+
+    setWarehouseOverflow("craft", previewOverflow.length > 0);
+  } else {
+    setWarehouseOverflow("craft", false);
+  }
+
+  document.getElementById("recipe-info").innerHTML = html;
 }
 
 function setMarketMax(mode) {
@@ -460,6 +775,7 @@ function setCraftMax() {
   }
   if (!Number.isFinite(maxBatches)) maxBatches = 0;
   document.getElementById("craft-qty").value = String(Math.max(0, maxBatches));
+  updateRecipeInfo();
 }
 
 function setHireMax() {

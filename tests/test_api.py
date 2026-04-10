@@ -154,6 +154,13 @@ class TestApiState:
             ]:
                 assert field in machine
 
+    def test_state_contains_warehouse_and_contracts(self, client):
+        payload = client.get("/api/state").get_json()
+        assert "warehouse" in payload
+        assert "contracts" in payload
+        assert "contract_history" in payload
+        assert "market_event" in payload
+
 
 # ── /api/buy ─────────────────────────────────────────────────────────────────
 
@@ -333,6 +340,28 @@ class TestApiMachines:
         payload = client.get("/api/state").get_json()
 
         assert "predictive" in payload["maintenance_strategies"]
+
+
+class TestApiOperations:
+    def test_upgrade_warehouse_endpoint(self, client):
+        web_gui._game.cash = 5000.0
+        resp = client.post("/api/upgrade_warehouse", json={})
+        payload = resp.get_json()
+        assert payload["message"].startswith("Warehouse upgraded")
+        assert payload["state"]["warehouse"]["level"] == 2
+
+    def test_accept_and_claim_contract_endpoints(self, client):
+        state = client.get("/api/state").get_json()
+        contract = next(c for c in state["contracts"] if c["status"] == "open")
+        web_gui._game.inventory[contract["item"]] = contract["qty"]
+
+        accept = client.post("/api/accept_contract", json={"contract_id": contract["id"]}).get_json()
+        claim = client.post("/api/claim_contract", json={"contract_id": contract["id"]}).get_json()
+
+        assert accept["message"].startswith("Accepted contract")
+        assert claim["message"].startswith("Claimed contract")
+        assert all(active["id"] != contract["id"] for active in claim["state"]["contracts"])
+        assert claim["state"]["contract_history"][0]["status"] == "claimed"
 
 
 # ── /api/fire ────────────────────────────────────────────────────────────────

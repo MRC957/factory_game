@@ -25,6 +25,7 @@ export function createDOM() {
     <!-- Tab buttons (referenced by applyTranslations + switchTab) -->
     <button id="tab-btn-market"></button>
     <button id="tab-btn-factory"></button>
+    <button id="tab-btn-contracts"></button>
     <button id="tab-btn-blueprints"></button>
     <button id="tab-btn-margins"></button>
 
@@ -32,11 +33,13 @@ export function createDOM() {
     <div id="tab-bar">
       <button class="tab-btn" data-tab="market"></button>
       <button class="tab-btn" data-tab="factory"></button>
+      <button class="tab-btn" data-tab="contracts"></button>
       <button class="tab-btn" data-tab="blueprints"></button>
       <button class="tab-btn" data-tab="margins"></button>
     </div>
     <div id="tab-market"     class="tab-panel active"></div>
     <div id="tab-factory"    class="tab-panel"></div>
+    <div id="tab-contracts"  class="tab-panel"></div>
     <div id="tab-blueprints" class="tab-panel"></div>
     <div id="tab-margins"    class="tab-panel"></div>
 
@@ -69,6 +72,8 @@ export function createDOM() {
     <aside id="inventory-sidebar">
       <span   id="inventory-sidebar-title"></span>
       <button id="btn-toggle-inventory"></button>
+      <div id="warehouse-info"></div>
+      <button id="btn-upgrade-warehouse"></button>
       <div class="inv-grid" id="inventory-sidebar-grid"></div>
     </aside>
 
@@ -122,7 +127,13 @@ export function createDOM() {
     <span id="automation-title"></span>
     <span id="automation-note"></span>
     <div  id="assign-list"></div>
+    <button id="btn-assign-all"></button>
     <div  id="automation-preview"></div>
+
+    <!-- Contracts -->
+    <div id="contracts-summary"></div>
+    <div id="contracts-list"></div>
+    <div id="contract-history-list"></div>
 
     <!-- Machines -->
     <span id="machine-fleet-title"></span>

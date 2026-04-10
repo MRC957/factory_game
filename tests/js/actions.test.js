@@ -345,6 +345,28 @@ describe('machine actions', () => {
   })
 })
 
+describe('contract actions', () => {
+  it('POSTs to /api/accept_contract with the contract id', async () => {
+    fetchMock.mockResolvedValueOnce({
+      json: async () => apiResponse('Accepted contract', { contracts: MOCK_STATE.contracts }),
+    })
+    await window.doAcceptContract('abc12345')
+    const [url, opts] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/accept_contract')
+    expect(JSON.parse(opts.body)).toMatchObject({ contract_id: 'abc12345' })
+  })
+
+  it('POSTs to /api/claim_contract with the contract id', async () => {
+    fetchMock.mockResolvedValueOnce({
+      json: async () => apiResponse('Claimed contract', { contracts: [], contract_history: MOCK_STATE.contract_history }),
+    })
+    await window.doClaimContract('def67890')
+    const [url, opts] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/claim_contract')
+    expect(JSON.parse(opts.body)).toMatchObject({ contract_id: 'def67890' })
+  })
+})
+
 // ── doBuyBlueprint ────────────────────────────────────────────────────────────
 
 describe('doBuyBlueprint()', () => {

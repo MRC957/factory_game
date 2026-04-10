@@ -39,6 +39,12 @@ class _GameplayContext:
     def _machine_state(self, recipe_name: str) -> dict[str, Any]:
         ...
 
+    def _overflow_to_waste(self) -> dict[str, int]:
+        ...
+
+    def _recipe_byproduct(self, recipe_name: str, batches: int) -> dict[str, int]:
+        ...
+
 
 class GameplayActionsMixin(_GameplayContext):
     def _max_batches(self, recipe) -> int:
@@ -79,12 +85,16 @@ class GameplayActionsMixin(_GameplayContext):
 
         self.cash -= total
         self.inventory[item] += qty
+        overflowed = self._overflow_to_waste()
+        overflow_note = ""
+        if overflowed:
+            overflow_note = "\nWarehouse overflow converted some inventory to waste."
         if is_night_market:
             return (
                 f"Bought {qty} {item} for ${total:.2f} (night-market surcharge +{int(NIGHT_MARKET_SURCHARGE * 100)}%)."
-                f"\n{self._consume_action_time(1)}"
+                f"{overflow_note}\n{self._consume_action_time(1)}"
             )
-        return f"Bought {qty} {item} for ${total:.2f}.\n{self._consume_action_time(1)}"
+        return f"Bought {qty} {item} for ${total:.2f}.{overflow_note}\n{self._consume_action_time(1)}"
 
     def sell(self, item: str, qty: int) -> str:
         if item not in self.market_prices:
@@ -119,14 +129,25 @@ class GameplayActionsMixin(_GameplayContext):
         done = self._apply_recipe(recipe, effective_qty)
         if done == 0:
             return "Missing required inputs."
+        byproduct = self._recipe_byproduct(recipe_name, done)
+        for item, byproduct_qty in byproduct.items():
+            self.inventory[item] = self.inventory.get(item, 0) + byproduct_qty
+        overflowed = self._overflow_to_waste()
         self._mark_machine_used(recipe_name)
         per_batch_hours = MANUAL_CRAFT_HOURS.get(recipe_name, 2)
         time_report = self._consume_action_time(per_batch_hours * done)
         machine = self._machine_state(recipe_name)
         suffix = " (soft failure reduced throughput)" if machine["status"] == MachineStatus.SOFT_FAILURE.value else ""
+        byproduct_note = ""
+        if byproduct:
+            byproduct_text = ", ".join(f"+{qty} {item}" for item, qty in byproduct.items())
+            byproduct_note = f" {byproduct_text} byproduct"
+        overflow_note = ""
+        if overflowed:
+            overflow_note = " (overflow converted some output to waste)"
         if done < qty:
-            return f"Crafted {done}/{qty} batches of {recipe_name} (inputs or machine capacity limited){suffix}.\n{time_report}"
-        return f"Crafted {done} batches of {recipe_name}{suffix}.\n{time_report}"
+            return f"Crafted {done}/{qty} batches of {recipe_name} (inputs or machine capacity limited){suffix}{byproduct_note}{overflow_note}.\n{time_report}"
+        return f"Crafted {done} batches of {recipe_name}{suffix}{byproduct_note}{overflow_note}.\n{time_report}"
 
     def hire(self, qty: int) -> str:
         if qty <= 0:
@@ -180,6 +201,18 @@ class GameplayActionsMixin(_GameplayContext):
 
         self.assignments[recipe_name] = qty
         return f"Assigned {qty} worker(s) to {recipe_name}."
+
+    def assign_all(self, new_assignments: dict[str, int]) -> str:
+        """Set all worker assignments at once. Unknown recipes are ignored."""
+        filtered = {k: v for k, v in new_assignments.items() if k in self.recipes and v >= 0}
+        total = sum(filtered.values())
+        if total > self.total_workers:
+            return (f"Not enough workers. Total requested: {total}, "
+                    f"but only {self.total_workers} available.")
+        for recipe_name, qty in filtered.items():
+            self.assignments[recipe_name] = qty
+        parts = ", ".join(f"{r}: {filtered.get(r, self.assignments.get(r, 0))}" for r in self.recipes)
+        return f"Assignments updated: {parts}."
 
     def buy_blueprint(self, name: str) -> str:
         bp = self.blueprints.get(name)

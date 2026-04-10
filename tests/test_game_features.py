@@ -289,3 +289,109 @@ def test_predictive_risk_is_low_before_day_and_high_after_day() -> None:
     after_chance = game._machine_failure_chance("ingot")
 
     assert after_chance > before_chance
+
+
+def test_warehouse_upgrade_increases_capacity() -> None:
+    game = FactoryGame(seed=5)
+    game.cash = 5000.0
+    capacity_before = game._warehouse_capacity()
+
+    message = game.upgrade_warehouse()
+
+    assert message.startswith("Warehouse upgraded")
+    assert game._warehouse_capacity() > capacity_before
+
+
+def test_buy_can_overflow_into_waste() -> None:
+    game = FactoryGame(seed=5)
+    game.cash = 10000.0
+
+    game.buy("ore", 100)
+
+    assert game.waste_inventory["scrap"] > 0
+    assert game._warehouse_used() <= game._warehouse_capacity()
+
+
+def test_contract_accept_and_claim_flow() -> None:
+    game = FactoryGame(seed=5)
+    game.cash = 5000.0
+    contract = next(c for c in game.contract_offers if c["status"] == "open")
+    game.inventory[contract["item"]] = contract["qty"]
+
+    accept_message = game.accept_contract(contract["id"])
+    claim_message = game.claim_contract(contract["id"])
+
+    assert accept_message.startswith("Accepted contract")
+    assert claim_message.startswith("Claimed contract")
+    assert all(active["id"] != contract["id"] for active in game.contract_offers)
+    assert game.contract_history[0]["status"] == "claimed"
+
+
+def test_worker_automation_preview_includes_waste_generation() -> None:
+    game = FactoryGame(seed=5)
+    game.cash = 5000.0
+    game.buy_machine("gear")
+    game.inventory["ingot"] = 8
+    game.inventory["wood"] = 4
+    game.total_workers = 2
+    game.assignments["gear"] = 2
+
+    preview = game.preview_end_of_day_automation()
+
+    assert preview["waste_generated"]["scrap"] == 1
+
+
+def test_open_contract_expires_and_is_removed_without_penalty() -> None:
+    game = FactoryGame(seed=5)
+    contract = next(c for c in game.contract_offers if c["status"] == "open")
+    contract["deadline_day"] = game.day
+    cash_before = game.cash
+
+    lines = game._update_contracts_for_new_day()
+
+    assert any("expired" in line.lower() for line in lines)
+    assert all(active["id"] != contract["id"] for active in game.contract_offers)
+    assert game.contract_history[0]["status"] == "expired"
+    assert game.cash == cash_before
+
+
+def test_accepted_contract_missed_deadline_pays_penalty() -> None:
+    game = FactoryGame(seed=5)
+    contract = next(c for c in game.contract_offers if c["status"] == "open")
+    game.accept_contract(contract["id"])
+    contract["deadline_day"] = game.day
+    cash_before = game.cash
+
+    lines = game._update_contracts_for_new_day()
+
+    assert any("penalty" in line.lower() for line in lines)
+    assert game.cash == pytest.approx(cash_before - contract["penalty"])
+    assert all(active["id"] != contract["id"] for active in game.contract_offers)
+    assert game.contract_history[0]["status"] == "failed"
+
+
+def test_worker_senior_bonus_after_streak() -> None:
+    game = FactoryGame(seed=5)
+    game.cash = 5000.0
+    game.buy_machine("ingot")
+    game.inventory["ore"] = 100
+    game.total_workers = 2
+    game.assignments["ingot"] = 2
+    game.worker_recipe_streak_days["ingot"] = 10
+
+    preview = game.preview_end_of_day_automation()
+
+    assert preview["produced"].get("ingot", 0) >= 2
+
+
+def test_market_event_can_start_and_end() -> None:
+    game = FactoryGame(seed=5)
+    game.rng.random = lambda: 0.0
+
+    start_lines = game._update_market_event_for_new_day()
+    assert game.market_event is not None
+    assert any("started" in line for line in start_lines)
+
+    game.market_event["days_left"] = 1
+    end_lines = game._update_market_event_for_new_day()
+    assert any("ended" in line for line in end_lines)

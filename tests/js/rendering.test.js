@@ -192,6 +192,12 @@ describe('renderInventory()', () => {
     // Should not throw.
     expect(() => window.renderInventory(MOCK_STATE, 'nonexistent-id')).not.toThrow()
   })
+
+  it('renders warehouse summary and upgrade cost in the sidebar controls', () => {
+    window.renderInventory(MOCK_STATE, 'inventory-sidebar-grid')
+    expect(document.getElementById('warehouse-info').textContent).toContain('11/80 used')
+    expect(document.getElementById('btn-upgrade-warehouse').textContent).toContain('$300.00')
+  })
 })
 
 // ── renderFactory ─────────────────────────────────────────────────────────────
@@ -315,6 +321,35 @@ describe('renderFactory()', () => {
     const smelterCard = cards.find(card => card.textContent.includes('Smelter'))
     expect(smelterCard?.textContent).toContain('Wear: 3 / 60d')
     expect(smelterCard?.textContent).not.toContain('Life:')
+  })
+
+  it('renders automation waste and no overflow warning when preview is safe', () => {
+    const state = cloneState({
+      automation_preview: {
+        produced: { ingot: 1 },
+        waste_generated: { scrap: 1 },
+        overflowed: {},
+        warehouse_used: 12,
+        warehouse_capacity: 80,
+      },
+    })
+    window.renderFactory(state)
+    expect(document.getElementById('automation-preview').textContent).toContain('Waste:')
+    expect(document.getElementById('automation-preview').textContent).not.toContain('Warehouse overflow')
+  })
+})
+
+describe('renderContracts()', () => {
+  it('renders grouped contracts and highlights due-soon offers', () => {
+    window.renderContracts(MOCK_STATE)
+    expect(document.getElementById('contracts-list').textContent).toContain('Ingot Supply')
+    expect(document.querySelectorAll('#contracts-list .contract-group').length).toBeGreaterThan(0)
+    expect(document.querySelector('#contracts-list .contract-due-soon')).not.toBeNull()
+  })
+
+  it('renders contract history in the margins dashboard', () => {
+    window.renderContractHistory(MOCK_STATE)
+    expect(document.getElementById('contract-history-list').textContent).toContain('claimed')
   })
 })
 

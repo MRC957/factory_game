@@ -53,10 +53,58 @@ async function doAssign(recipe) {
   });
 }
 
+async function doAssignAll() {
+  const assignments = {};
+  (G?.recipes ?? []).forEach(recipe => {
+    const el = document.getElementById("assign-" + recipe);
+    if (el) assignments[recipe] = QtyInput.parse(el.value, 0);
+  });
+  const r = await api("/api/assign_all", { assignments });
+  log(r.message, r.message.startsWith("Assignments updated") ? "log-ok" : "log-err");
+  renderAction(r.state, {
+    status: true,
+    factory: true,
+  });
+}
+
 async function doBuyBlueprint(name) {
   const r = await api("/api/buy_blueprint", { name });
   log(r.message, r.message.startsWith("Bought") ? "log-ok" : "log-err");
   render(r.state);
+}
+
+async function doUpgradeWarehouse() {
+  const r = await api("/api/upgrade_warehouse", {});
+  log(r.message, r.message.startsWith("Warehouse upgraded") ? "log-ok" : "log-err");
+  renderAction(r.state, {
+    status: true,
+    inventory: true,
+    factory: true,
+    contracts: true,
+    margins: true,
+  });
+}
+
+async function doAcceptContract(contractId) {
+  const r = await api("/api/accept_contract", { contract_id: contractId });
+  log(r.message, r.message.startsWith("Accepted contract") ? "log-ok" : "log-err");
+  renderAction(r.state, {
+    status: true,
+    contracts: true,
+    margins: true,
+    inventory: true,
+  });
+}
+
+async function doClaimContract(contractId) {
+  const r = await api("/api/claim_contract", { contract_id: contractId });
+  log(r.message, r.message.startsWith("Claimed contract") ? "log-ok" : "log-err");
+  renderAction(r.state, {
+    status: true,
+    inventory: true,
+    contracts: true,
+    margins: true,
+  });
 }
 
 async function doBuyMachine(recipe) {

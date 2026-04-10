@@ -22,6 +22,7 @@ from game_factory.game import (
 from game_factory.game_constants  import (
     ITEM_CATALOG,
     ITEM_IDS,
+    MANUAL_CRAFT_HOURS,
     MARKET_CLOSE_HOUR,
     MARKET_OPEN_HOUR,
     MACHINE_CATALOG,
@@ -122,6 +123,7 @@ def _game_state(compact: bool = False) -> dict[str, Any]:
         "items": list(ITEM_IDS),
         "recipes": list(RECIPE_IDS),
         "item_icons": {item_name: str(item["icon"]) for item_name, item in ITEM_CATALOG.items()},
+        "craft_hours": dict(MANUAL_CRAFT_HOURS),
         "total_workers": g.total_workers,
         "assigned_workers": assigned,
         # free_workers is derived here so the client doesn't have to compute it.
@@ -149,6 +151,23 @@ def _game_state(compact: bool = False) -> dict[str, Any]:
             }
             for recipe_name in RECIPE_IDS
         },
+        "warehouse": {
+            "level": g.warehouse_level,
+            "capacity": g._warehouse_capacity(),
+            "used": g._warehouse_used(),
+            "upgrade_cost": round(300.0 * g.warehouse_level, 2),
+        },
+        "worker_progression": {
+            recipe_name: {
+                "streak_days": g.worker_recipe_streak_days.get(recipe_name, 0),
+                "senior_bonus": g.senior_bonus_workers(recipe_name),
+            }
+            for recipe_name in g.recipes
+        },
+        "contracts": [dict(c) for c in g.contract_offers],
+        "contract_history": [dict(c) for c in g.contract_history],
+        "waste_inventory": dict(g.waste_inventory),
+        "market_event": dict(g.market_event) if g.market_event else None,
         "automation_preview": g.preview_end_of_day_automation(),
         "owned_blueprints": list(g.owned_blueprints),
         # Bankruptcy threshold is -$500 (a small grace buffer below zero).
@@ -245,6 +264,14 @@ def api_assign() -> Any:
     return jsonify({"message": msg, "state": _game_state(compact=True)})
 
 
+@app.route("/api/assign_all", methods=["POST"])
+def api_assign_all() -> Any:
+    data = request.get_json(force=True)
+    assignments = {str(k): int(v) for k, v in data.get("assignments", {}).items()}
+    msg = _current_game().assign_all(assignments)
+    return jsonify({"message": msg, "state": _game_state(compact=True)})
+
+
 @app.route("/api/buy_machine", methods=["POST"])
 def api_buy_machine() -> Any:
     data = request.get_json(force=True)
@@ -276,6 +303,26 @@ def api_buy_blueprint() -> Any:
     data = request.get_json(force=True)
     msg = _current_game().buy_blueprint(str(data["name"]))
     return jsonify({"message": msg, "state": _game_state()})
+
+
+@app.route("/api/upgrade_warehouse", methods=["POST"])
+def api_upgrade_warehouse() -> Any:
+    msg = _current_game().upgrade_warehouse()
+    return jsonify({"message": msg, "state": _game_state(compact=True)})
+
+
+@app.route("/api/accept_contract", methods=["POST"])
+def api_accept_contract() -> Any:
+    data = request.get_json(force=True)
+    msg = _current_game().accept_contract(str(data["contract_id"]))
+    return jsonify({"message": msg, "state": _game_state(compact=True)})
+
+
+@app.route("/api/claim_contract", methods=["POST"])
+def api_claim_contract() -> Any:
+    data = request.get_json(force=True)
+    msg = _current_game().claim_contract(str(data["contract_id"]))
+    return jsonify({"message": msg, "state": _game_state(compact=True)})
 
 
 @app.route("/api/next_day", methods=["POST"])

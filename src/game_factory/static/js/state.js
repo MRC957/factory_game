@@ -49,6 +49,7 @@ const I18N = {
     language: "Language",
     tabMarket: "Market",
     tabFactory: "Factory",
+    tabContracts: "Contracts",
     tabBlueprints: "Blueprints",
     tabMargins: "Margins",
     marketPrices: "Market Prices",
@@ -82,6 +83,7 @@ const I18N = {
     maxFire: "Max Fire",
     fireWorkers: "Fire Workers",
     automationAssignment: "Automation Assignment",
+    setAllAssignments: "Set All Assignments",
     automationNote: "Workers produce 1 batch per assigned worker per day automatically.",
     automationPreviewTitle: "End-of-day automation preview",
     automationPreviewNone: "No automated output expected with current assignments and inputs.",
@@ -136,6 +138,7 @@ const I18N = {
     language: "Langue",
     tabMarket: "Marché",
     tabFactory: "Usine",
+    tabContracts: "Contrats",
     tabBlueprints: "Plans",
     tabMargins: "Marges",
     marketPrices: "Prix du marché",
@@ -169,6 +172,7 @@ const I18N = {
     maxFire: "Max Licencier",
     fireWorkers: "Licencier",
     automationAssignment: "Affectation automatique",
+    setAllAssignments: "Appliquer toutes les affectations",
     automationNote: "Chaque ouvrier affecté produit 1 lot par jour automatiquement.",
     automationPreviewTitle: "Aperçu de production automatique en fin de journée",
     automationPreviewNone: "Aucune production automatique attendue avec les affectations et stocks actuels.",
@@ -232,6 +236,7 @@ function applyTranslations() {
   document.getElementById("lbl-lang").textContent = t("language");
   document.getElementById("tab-btn-market").textContent = t("tabMarket");
   document.getElementById("tab-btn-factory").textContent = t("tabFactory");
+  document.getElementById("tab-btn-contracts").textContent = t("tabContracts");
   document.getElementById("tab-btn-blueprints").textContent = t("tabBlueprints");
   document.getElementById("tab-btn-margins").textContent = t("tabMargins");
   document.getElementById("market-prices-title").textContent = t("marketPrices");
@@ -262,6 +267,7 @@ function applyTranslations() {
   document.getElementById("btn-max-fire").textContent = t("maxFire");
   document.getElementById("btn-fire").textContent = t("fireWorkers");
   document.getElementById("automation-title").textContent = t("automationAssignment");
+  document.getElementById("btn-assign-all").textContent = t("setAllAssignments");
   document.getElementById("automation-note").textContent = t("automationNote");
   document.getElementById("machine-fleet-title").textContent = t("machineFleetTitle");
   document.getElementById("machine-note").textContent = t("machineNote");
@@ -351,12 +357,40 @@ function parseCraftQty(rawValue, fallback = 0) {
   return QtyInput.parse(rawValue, fallback);
 }
 
+function computeCraftMax() {
+  if (!G) return 0;
+  const recipeName = document.getElementById("craft-recipe")?.value;
+  const recipe = G.effective_recipes?.[recipeName];
+  if (!recipe) return 0;
+  const entries = Object.entries(recipe.inputs || {});
+  if (entries.length === 0) return 0;
+  let max = Number.POSITIVE_INFINITY;
+  entries.forEach(([item, qty]) => {
+    if (qty > 0) max = Math.min(max, Math.floor((G.inventory?.[item] ?? 0) / qty));
+  });
+  return Number.isFinite(max) ? Math.max(0, max) : 0;
+}
+
 function onCraftQtyInput() {
   QtyInput.normalize("craft-qty", 0);
+  const max = computeCraftMax();
+  const el = document.getElementById("craft-qty");
+  if (el) {
+    const current = QtyInput.parse(el.value, 0);
+    if (current > max) el.value = String(max);
+  }
+  updateRecipeInfo();
 }
 
 function adjustCraftQty(delta) {
+  const max = computeCraftMax();
   QtyInput.adjust("craft-qty", delta, 0);
+  const el = document.getElementById("craft-qty");
+  if (el) {
+    const current = QtyInput.parse(el.value, 0);
+    if (current > max) el.value = String(max);
+  }
+  updateRecipeInfo();
 }
 
 function parseHireQty(rawValue, fallback = 0) {

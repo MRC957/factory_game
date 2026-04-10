@@ -205,7 +205,7 @@ describe('switchTab()', () => {
 
   it('deactivates all other tab panels', () => {
     window.switchTab('blueprints')
-    const inactive = ['market', 'factory', 'margins']
+    const inactive = ['market', 'factory', 'contracts', 'margins']
     for (const name of inactive) {
       expect(document.getElementById(`tab-${name}`).classList.contains('active')).toBe(false)
     }
@@ -219,15 +219,15 @@ describe('switchTab()', () => {
 
   it('deactivates all other tab buttons', () => {
     window.switchTab('market')
-    const others = ['factory', 'blueprints', 'margins']
+    const others = ['factory', 'contracts', 'blueprints', 'margins']
     for (const name of others) {
       const btn = document.querySelector(`#tab-bar .tab-btn[data-tab="${name}"]`)
       expect(btn?.classList.contains('active')).toBe(false)
     }
   })
 
-  it('can switch between all four tabs', () => {
-    for (const name of ['market', 'factory', 'blueprints', 'margins']) {
+  it('can switch between all five tabs', () => {
+    for (const name of ['market', 'factory', 'contracts', 'blueprints', 'margins']) {
       window.switchTab(name)
       expect(document.getElementById(`tab-${name}`).classList.contains('active')).toBe(true)
     }
@@ -241,11 +241,13 @@ describe('applyTranslations()', () => {
     window.setLanguage('en')
     expect(document.getElementById('tab-btn-market').textContent).toBe('Market')
     expect(document.getElementById('tab-btn-factory').textContent).toBe('Factory')
+    expect(document.getElementById('tab-btn-contracts').textContent).toBe('Contracts')
   })
 
   it('sets tab button text in French', () => {
     window.setLanguage('fr')
     expect(document.getElementById('tab-btn-market').textContent).toBe('Marché')
+    expect(document.getElementById('tab-btn-contracts').textContent).toBe('Contrats')
     window.setLanguage('en')
   })
 

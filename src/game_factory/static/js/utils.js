@@ -13,11 +13,18 @@ function fmtS(n)  { return (n >= 0 ? "+" : "") + "$" + n.toFixed(2); }
 
 // Append one or more lines to the activity log at the bottom of the screen.
 // msg may contain newlines (multi-day advance output); each line gets its own div.
+// When cls is empty, each line is auto-classified: contract failed → red,
+// contract expired → orange.
 function log(msg, cls = "") {
   const box = document.getElementById("log-box");
   msg.split("\n").filter(Boolean).forEach(line => {
     const div = document.createElement("div");
-    div.className = "log-entry " + cls;
+    let lineCls = cls;
+    if (!lineCls) {
+      if (/contract.*failed|penalty.*deducted/i.test(line)) lineCls = "log-err";
+      else if (/contract.*expired/i.test(line)) lineCls = "log-warn";
+    }
+    div.className = "log-entry " + lineCls;
     div.textContent = line;
     box.appendChild(div);
   });
